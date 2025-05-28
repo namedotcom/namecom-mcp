@@ -1,0 +1,194 @@
+// Mock the config module to avoid import.meta issues
+jest.mock('../src/config.js', () => ({
+  NAME_USERNAME: 'test-username',
+  NAME_TOKEN: 'test-token',
+  NAME_API_URL: 'https://api.dev.name.com'
+}));
+
+// Mock fetch globally before importing any modules
+const mockFetch = jest.fn();
+global.fetch = mockFetch as any;
+
+import { callNameApi } from '../src/api-client.js';
+
+describe('API Client', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockFetch.mockClear();
+  });
+
+  describe('callNameApi', () => {
+    it('should make GET request with correct headers and URL', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ domains: [] }),
+        headers: new Map([['content-type', 'application/json']])
+      });
+
+      const result = await callNameApi('/core/v1/domains');
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://api.dev.name.com/core/v1/domains',
+        expect.objectContaining({
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Authorization': expect.stringMatching(/^Basic /),
+            'Content-Type': 'application/json'
+          })
+        })
+      );
+      expect(result).toEqual({ domains: [] });
+    });
+
+    it('should make POST request with body', async () => {
+      const requestBody = { keyword: 'test' };
+      
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ results: [] }),
+        headers: new Map([['content-type', 'application/json']])
+      });
+
+      const result = await callNameApi('/core/v1/domains', 'POST', requestBody);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://api.dev.name.com/core/v1/domains',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify(requestBody),
+          headers: expect.objectContaining({
+            'Authorization': expect.stringMatching(/^Basic /),
+            'Content-Type': 'application/json'
+          })
+        })
+      );
+      expect(result).toEqual({ results: [] });
+    });
+
+    it('should include authorization header with base64 encoded credentials', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({}),
+        headers: new Map([['content-type', 'application/json']])
+      });
+
+      await callNameApi('/core/v1/domains');
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/core/v1/domains'),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            'Authorization': expect.stringMatching(/^Basic [A-Za-z0-9+/]+=*$/)
+          })
+        })
+      );
+    });
+
+    it('should handle different HTTP methods', async () => {
+      const requestBody = { test: 'data' };
+      
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({}),
+        headers: new Map([['content-type', 'application/json']])
+      });
+
+      await callNameApi('/core/v1/domains', 'POST', requestBody);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://api.dev.name.com/core/v1/domains',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify(requestBody)
+        })
+      );
+    });
+
+    it('should handle GET requests without body', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({}),
+        headers: new Map([['content-type', 'application/json']])
+      });
+
+      await callNameApi('/core/v1/domains', 'GET');
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://api.dev.name.com/core/v1/domains',
+        expect.objectContaining({
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Authorization': expect.stringMatching(/^Basic /),
+            'Content-Type': 'application/json'
+          })
+        })
+      );
+    });
+
+    it('should throw error for non-ok responses', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+        text: async () => 'Domain not found'
+      });
+
+      await expect(callNameApi('/core/v1/error')).rejects.toThrow(
+        'Name.com API error: 404 Not Found - Domain not found'
+      );
+    });
+
+    it('should support all HTTP methods', async () => {
+      const methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'] as const;
+      
+      for (const method of methods) {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({}),
+          headers: new Map([['content-type', 'application/json']])
+        });
+
+        await callNameApi('/core/v1/domains', method);
+
+        expect(mockFetch).toHaveBeenLastCalledWith(
+          'https://api.dev.name.com/core/v1/domains',
+          expect.objectContaining({ method })
+        );
+      }
+    });
+
+    it('should construct URLs correctly with path parameters', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({}),
+        headers: new Map([['content-type', 'application/json']])
+      });
+
+      await callNameApi('/core/v1/domains/test.com');
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://api.dev.name.com/core/v1/domains/test.com',
+        expect.any(Object)
+      );
+    });
+
+    it('should handle 204 No Content responses', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 204,
+        headers: new Map()
+      });
+
+      const result = await callNameApi('/core/v1/domains/example.com/records/1', 'DELETE');
+
+      expect(result).toBeUndefined();
+    });
+  });
+}); 

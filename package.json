@@ -1,0 +1,66 @@
+{
+  "name": "namecom-mcp",
+  "version": "1.0.0",
+  "description": "A Model Context Protocol (MCP) server for Name.com API integration, providing AI assistants with domain management capabilities",
+  "main": "dist/index.js",
+  "type": "module",
+  "bin": {
+    "name-com-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "node --loader ts-node/esm src/index.ts",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:ci": "jest --ci --coverage --watchAll=false",
+    "prepublishOnly": "npm run build && npm run test:ci"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "name.com",
+    "namecom",
+    "domain",
+    "dns",
+    "api",
+    "ai",
+    "assistant",
+    "claude"
+  ],
+  "author": "Name.com Engineering",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/namedotcom/namecom-mcp"
+  },
+  "bugs": {
+    "url": "https://github.com/namedotcom/namecom-mcp/issues"
+  },
+  "homepage": "https://github.com/namedotcom/namecom-mcp#readme",
+  "files": [
+    "dist/**/*",
+    "assets/**/*",
+    "README.md",
+    "LICENSE",
+    "env.example"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.8.0",
+    "dotenv": "^16.4.7",
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.14.0",
+    "@types/jest": "^29.5.12",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.2"
+  }
+}
