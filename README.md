@@ -26,7 +26,7 @@ A Model Context Protocol (MCP) server that provides access to the Name.com API f
 The easiest way to get started - no building required!
 
 ```bash
-npm install -g name-com-mcp
+npm install -g namecom-mcp
 ```
 
 That's it! The package comes pre-compiled and ready to use.
@@ -36,8 +36,8 @@ That's it! The package comes pre-compiled and ready to use.
 Only needed if you want to modify the code:
 
 ```bash
-git clone https://github.com/yourusername/name-com-mcp.git
-cd name-com-mcp
+git clone https://github.com/namedotcom/namecom-mcp.git
+cd namecom-mcp
 npm install
 npm run build
 ```
@@ -63,9 +63,9 @@ Add the following to your Claude Desktop configuration file:
 ```json
 {
   "mcpServers": {
-    "name-com": {
+    "namecom": {
       "command": "npx",
-      "args": ["name-com-mcp"],
+      "args": ["namecom-mcp"],
       "env": {
         "NAME_USERNAME": "your-name-com-username",
         "NAME_TOKEN": "your-name-com-api-token"
@@ -79,9 +79,9 @@ Add the following to your Claude Desktop configuration file:
 ```json
 {
   "mcpServers": {
-    "name-com": {
+    "namecom": {
       "command": "node",
-      "args": ["/path/to/your/name-com-mcp/dist/index.js"],
+      "args": ["/path/to/your/namecom-mcp/dist/index.js"],
       "env": {
         "NAME_USERNAME": "your-name-com-username",
         "NAME_TOKEN": "your-name-com-api-token"
@@ -95,9 +95,9 @@ Add the following to your Claude Desktop configuration file:
 ```json
 {
   "mcpServers": {
-    "name-com": {
+    "namecom": {
       "command": "npx",
-      "args": ["name-com-mcp"],
+      "args": ["namecom-mcp"],
       "env": {
         "NAME_USERNAME": "your-name-com-username",
         "NAME_TOKEN": "your-name-com-api-token",
@@ -127,7 +127,7 @@ NAME_TOKEN=your-name-com-api-token
 
 1. **Install the package**:
    ```bash
-   npm install -g name-com-mcp
+   npm install -g namecom-mcp
    ```
 
 2. **Configure Claude Desktop** (see Configuration section above)
@@ -155,10 +155,10 @@ The MCP Inspector is **excellent for testing and debugging** during development,
 2. **Run the Inspector**:
    ```bash
    # For NPM installation:
-   npx @modelcontextprotocol/inspector npx name-com-mcp
+   npx @modelcontextprotocol/inspector npx namecom-mcp
    
    # For local development:
-   npx @modelcontextprotocol/inspector node "/path/to/your/name-com-mcp/dist/index.js"
+   npx @modelcontextprotocol/inspector node "/path/to/your/namecom-mcp/dist/index.js"
    ```
 
 3. **Open the Inspector**:
@@ -233,8 +233,8 @@ The server dynamically generates tools based on the Name.com OpenAPI specificati
 Building from source is only needed if you want to modify the code or contribute to the project.
 
 ```bash
-git clone https://github.com/yourusername/name-com-mcp.git
-cd name-com-mcp
+git clone https://github.com/namedotcom/namecom-mcp.git
+cd namecom-mcp
 npm install
 npm run build
 ```
@@ -269,14 +269,14 @@ The package is automatically built before publishing thanks to the `prepublishOn
 2. **API URL Issues**: The tool defaults to test environment (`api.dev.name.com`)
 3. **Tool Generation Fails**: The server will fall back to basic tools if OpenAPI spec loading fails
 4. **Package Not Found**: 
-   - Make sure you've installed the package: `npm install -g name-com-mcp`
-   - Try reinstalling if you encounter issues: `npm uninstall -g name-com-mcp && npm install -g name-com-mcp`
+   - Make sure you've installed the package: `npm install -g namecom-mcp`
+   - Try reinstalling if you encounter issues: `npm uninstall -g namecom-mcp && npm install -g namecom-mcp`
 5. **Claude Desktop Configuration Issues**:
    - Check your `claude_desktop_config.json` file path and syntax
    - Restart Claude Desktop after configuration changes
-   - Verify the command is `npx` and args are `["name-com-mcp"]`
+   - Verify the command is `npx` and args are `["namecom-mcp"]`
 6. **MCP Inspector Connection Issues**:
-   - For NPM installation, use: `npx @modelcontextprotocol/inspector npx name-com-mcp`
+   - For NPM installation, use: `npx @modelcontextprotocol/inspector npx namecom-mcp`
    - Check that your environment variables are set correctly
 
 ### Debug Mode
@@ -284,7 +284,7 @@ The package is automatically built before publishing thanks to the `prepublishOn
 Set the environment variable `DEBUG=1` for verbose logging:
 
 ```bash
-DEBUG=1 npx name-com-mcp
+DEBUG=1 npx namecom-mcp
 ```
 
 ### Getting Help
@@ -309,10 +309,10 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Support
 
-- **Issues**: Report bugs and feature requests on [GitHub Issues](https://github.com/yourusername/name-com-mcp/issues)
+- **Issues**: Report bugs and feature requests on [GitHub Issues](https://github.com/namedotcom/namecom-mcp/issues)
 - **Documentation**: See the [Name.com API Documentation](https://www.name.com/api-docs) for API details
 - **MCP Protocol**: Learn more about [Model Context Protocol](https://modelcontextprotocol.io/)
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for version history and updates. 
+See the [GitHub Releases](https://github.com/namedotcom/namecom-mcp/releases) page for version history and updates. 
