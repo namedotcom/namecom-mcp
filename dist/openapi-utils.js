@@ -1,18 +1,28 @@
 import path from "path";
-import { fileURLToPath } from "url";
 import { load } from "js-yaml";
 import fs from "fs/promises";
 import { z } from "zod";
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 // Global variable to store the loaded spec for reference resolution
 let globalSpec = null;
+/**
+ * Set the global spec for testing purposes
+ */
+export function setGlobalSpec(spec) {
+    globalSpec = spec;
+}
+/**
+ * Get the current global spec (for testing purposes)
+ */
+export function getGlobalSpec() {
+    return globalSpec;
+}
 /**
  * Load and parse OpenAPI spec from YAML file
  */
 export async function loadOpenApiSpec() {
     try {
-        const specPath = path.resolve(__dirname, '../assets/namecom.api.yaml');
+        // Use relative path from project root
+        const specPath = path.resolve(process.cwd(), 'assets/namecom.api.yaml');
         const yamlContent = await fs.readFile(specPath, 'utf8');
         const loadedSpec = load(yamlContent);
         // Store the loaded spec to resolve references later
@@ -27,33 +37,45 @@ export async function loadOpenApiSpec() {
 /**
  * Resolve $ref in OpenAPI schema and handle allOf, oneOf, anyOf
  */
-export function resolveSchemaRef(schema) {
+export function resolveSchemaRef(schema, visitedRefs = new Set()) {
     // Base case: no schema provided
     if (!schema) {
         return {};
     }
     // Handle direct references
     if (schema.$ref && globalSpec?.components?.schemas) {
+        // Check for cycles to prevent infinite recursion
+        if (visitedRefs.has(schema.$ref)) {
+            // Return the original ref for recursive schemas to avoid infinite expansion
+            return schema;
+        }
         // Extract the component name from the $ref
         const refParts = schema.$ref.split('/');
         const refName = refParts[refParts.length - 1];
         const resolvedSchema = globalSpec.components.schemas[refName];
         if (resolvedSchema) {
+            // Add this ref to visited set before recursing
+            const newVisited = new Set(visitedRefs);
+            newVisited.add(schema.$ref);
             // Recursively resolve if the referenced schema has its own references
-            return resolveSchemaRef(resolvedSchema);
+            return resolveSchemaRef(resolvedSchema, newVisited);
         }
         return schema; // Return original if reference can't be resolved
     }
     // Handle allOf (merge all schemas)
-    if (schema.allOf && schema.allOf.length > 0) {
+    if (schema.allOf) {
         // Start with an empty result schema
         const result = {
             properties: {},
             required: []
         };
+        // If allOf is empty, return the base schema structure
+        if (schema.allOf.length === 0) {
+            return result;
+        }
         // Merge all schemas in the allOf array
         for (const subSchema of schema.allOf) {
-            const resolved = resolveSchemaRef(subSchema);
+            const resolved = resolveSchemaRef(subSchema, visitedRefs);
             // Merge properties
             if (resolved.properties) {
                 result.properties = {
@@ -91,7 +113,7 @@ export function resolveSchemaRef(schema) {
                     required: [...(schema.required || [])]
                 };
                 for (const subSchema of subSchemas) {
-                    const resolved = resolveSchemaRef(subSchema);
+                    const resolved = resolveSchemaRef(subSchema, visitedRefs);
                     // Merge properties
                     if (resolved.properties) {
                         result.properties = {
@@ -106,9 +128,28 @@ export function resolveSchemaRef(schema) {
             }
             else {
                 // For oneOf, just use the first schema
-                return resolveSchemaRef(subSchemas[0]);
+                return resolveSchemaRef(subSchemas[0], visitedRefs);
             }
         }
+    }
+    // For object types, recursively resolve any $ref properties
+    if (schema.type === 'object' && schema.properties) {
+        const result = {
+            ...schema,
+            properties: {}
+        };
+        // Recursively resolve each property
+        Object.entries(schema.properties).forEach(([propName, propSchema]) => {
+            result.properties[propName] = resolveSchemaRef(propSchema, visitedRefs);
+        });
+        return result;
+    }
+    // For array types, recursively resolve the items schema
+    if (schema.type === 'array' && schema.items) {
+        return {
+            ...schema,
+            items: resolveSchemaRef(schema.items, visitedRefs)
+        };
     }
     return schema;
 }

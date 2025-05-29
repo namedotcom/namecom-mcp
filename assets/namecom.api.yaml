@@ -155,7 +155,7 @@ paths:
           name: sort
           schema:
             type: string
-        - description: Dir indicates direction of sort Possible values are 'asc' (default) or 'desc'.
+        - description: Dir indicates direction of sort. Possible values are 'asc' (default) or 'desc'.
           in: query
           name: dir
           schema:
@@ -274,11 +274,13 @@ paths:
         - Domains
     post:
       description: |
-        Registers a new domain under your account. You must provide the domain name and the desired registration period. 
+        Registers a new domain under your account. You must provide the `domain.domainName` at a bare minimum to register. 
         For premium or special-priced domains, the purchase_price must also be included to confirm cost. 
         This endpoint is commonly used to programmatically onboard new domains through user signup flows or checkout experiences.
 
-        ## Best Practices For Domain Creates
+        If no contacts are passed in this request, the default contacts for your Name.com account will be used.
+
+        ### Best Practices For Domain Creates
 
         In general, you should check that a domain is available prior to attempting to purchase a domain. 
         You can use either the [checkAvailability](#operation/CheckAvailability) endpoint, or the [Search](#operation/Search) endpoint
@@ -286,15 +288,7 @@ paths:
 
         #### Important Note on Dropcatching and Abuse Prevention
 
-        _The createDomain endpoint is designed for standard domain registrations and is not intended for automated dropcatching (i.e., mass or high-frequency attempts to register domains the moment they become available after expiration)._
-        _Attempting to use this endpoint for dropcatching — especially through rapid-fire or repeated registration attempts — may:_
-         - _Violate API Terms of Use._
-         - _Trigger rate limiting or IP blocking._
-         - _Result in reduced API performance or blocked access._
-
-        #### Not sure if we even offer this?
-
-        If you're interested in high-volume or competitive registrations, please contact our team to discuss appropriate solutions or access models.
+        _The createDomain endpoint is designed for standard domain registrations and is not intended for automated dropcatching (i.e., mass or high-frequency attempts to register domains the moment they become available after expiration). The use of drop-catching tools or services to acquire expired domains is strictly prohibited. All domain acquisitions must go through approved channels to ensure fair and transparent access._
       operationId: CreateDomain
       requestBody:
         content:
@@ -315,6 +309,42 @@ paths:
                   domain:
                     domainName: example.com
                   years: 2
+              premiumPurchase:
+                summary: Creating a premium domain
+                description: To create a premium domain, the `purchasePrice` and `purchaseType` parameters are required
+                value:
+                  domain:
+                    domainName: premiumexample.com
+                  purchasePrice: 349.95
+                  purchaseType: expiring
+              premiumPurchaseMultiYear:
+                summary: Creating a premium domain for multiple years
+                description: 'To create a premium domain for multiple years, the `purchasePrice`, `purchaseType` and `years` parameters are required. You will need to get the single year pricing, and then multiply the single year pricing by the number of years you wish to purchase the domain for. Example: 1 year pricing = 349.95. 2 year pricing = 699.90'
+                value:
+                  domain:
+                    domainName: premiumexample.com
+                  purchasePrice: 699.9
+                  purchaseType: expiring
+                  years: 2
+              singleContactAtCreate:
+                summary: Send single, specific contact with domain create
+                description: Generally all contacts need to be submitted when creating a domain that will not use your account default contacts. By passing a single contact during a domain create, you can set a single contact to be different than the account default contacts. This may also be required for some TLDs due to ICANN changes in registration contact requirements
+                value:
+                  domain:
+                    domainName: example.com
+                    contacts:
+                      tech:
+                        firstName: Jonny
+                        lastName: IT Guy
+                        companyName: My Company
+                        address1: 1234 Any Street
+                        address2: null
+                        city: Anytown
+                        state: NY
+                        zip: '11222'
+                        country: US
+                        email: support@example.com
+                        phone: '+1.5555555'
         description: CreateDomainRequest has the information that is needed to create a domain with the CreateDomain function.
         required: true
       responses:
@@ -392,12 +422,13 @@ paths:
           required: true
           schema:
             type: string
+            example: example.com
       responses:
         '200':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Domain'
+                $ref: '#/components/schemas/DomainResponsePayload'
           description: A successful response.
         '401':
           description: Unauthorized.
@@ -451,7 +482,7 @@ paths:
                   example: true
                 privacyEnabled:
                   type: boolean
-                  description: Enable or disable WHOIS privacy for the domain.
+                  description: Enable or disable Whois privacy for the domain.
                   example: true
                 locked:
                   type: boolean
@@ -470,7 +501,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Domain'
+                $ref: '#/components/schemas/DomainResponsePayload'
         '400':
           description: The request failed to pass validation. See the response message for information as to what failed validation.
           content:
@@ -2420,6 +2451,7 @@ paths:
           schema:
             format: int32
             type: integer
+            example: 2
       responses:
         '200':
           content:
@@ -2578,7 +2610,7 @@ paths:
         - Domains
   /core/v1/domains/{domainName}:renew:
     post:
-      description: Renews an existing domain for an additional registration period.  Include the domain name and renewal term.  If the domain has non-standard pricing (e.g. premium), the purchase_price must be passed.  This is typically used to extend ownership before a domain’s expiration.
+      description: Renews an existing domain for an additional registration period.  Include the domain name and renewal term.  If the domain has non-standard pricing (e.g. premium), the purchasePrice must be passed.  This is typically used to extend ownership before a domain’s expiration.
       operationId: RenewDomain
       parameters:
         - description: DomainName is the domain to renew.
@@ -2651,7 +2683,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Domain'
+                $ref: '#/components/schemas/DomainResponsePayload'
         '400':
           description: Bad request - Invalid query parameters.
           content:
@@ -2721,7 +2753,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Domain'
+                $ref: '#/components/schemas/DomainResponsePayload'
         '400':
           description: Bad request - Invalid query parameters.
           content:
@@ -3332,7 +3364,7 @@ paths:
       tags:
         - Transfers
     post:
-      description: Initiates a domain transfer into your Name.com account from another registrar.  You must provide the domain name and its valid transfer authorization code (EPP code).  The domain must not be locked or under any transfer restrictions (e.g. clientTransferProhibited).  If successful, the transfer is submitted and tracked through the ICANN transfer process. Once a transfer has been created, you can track it's progress via the [GetTransfer](#operation/GetTransfer) endpoint.
+      description: Initiates a domain transfer into your Name.com account from another registrar.  You must provide the domain name and its valid transfer authorization code (EPP code).  The domain must not be locked or under any transfer restrictions (e.g. clientTransferProhibited).  If successful, the transfer is submitted and tracked through the ICANN transfer process. Once a transfer has been created, you can track its progress via the [GetTransfer](#operation/GetTransfer) endpoint.
       operationId: CreateTransfer
       requestBody:
         content:
@@ -3820,11 +3852,13 @@ components:
           type: string
           format: date-time
           example: '2023-01-15T14:30:00Z'
+          readOnly: true
         expireDate:
           description: The date and time when the domain will expire.
           type: string
           format: date-time
           example: '2025-01-15T14:30:00Z'
+          readOnly: true
         autorenewEnabled:
           description: Indicates whether the domain is set to renew automatically before expiration.
           type: boolean
@@ -3852,13 +3886,29 @@ components:
           type: number
           format: double
           example: 12.99
+          readOnly: true
+    DomainResponsePayload:
+      description: The response format for a domain.
+      allOf:
+        - $ref: '#/components/schemas/Domain'
+        - type: object
+          required:
+            - domainName
+            - createDate
+            - expireDate
+            - autorenewEnabled
+            - locked
+            - privacyEnabled
+            - contacts
+            - nameservers
+            - renewalPrice
     ListDomainsResponse:
       description: ListDomainsResponse is the response from a list request, it contains the paginated list of Domains.
       properties:
         domains:
           description: Domains is the list of domains in your account.
           items:
-            $ref: '#/components/schemas/Domain'
+            $ref: '#/components/schemas/DomainResponsePayload'
           type: array
         from:
           description: From is starting record count for current page.
@@ -3881,17 +3931,28 @@ components:
           format: int32
           type: integer
       type: object
+      required:
+        - to
+        - from
+        - totalCount
+    DomainCreatePayload:
+      description: The payload to be sent for when making a request to purchase a domain.
+      allOf:
+        - $ref: '#/components/schemas/Domain'
+        - type: object
+          required:
+            - domainName
     CreateDomainRequest:
       description: CreateDomainRequest has the information that is needed to create a domain with the CreateDomain function.
       properties:
         domain:
-          $ref: '#/components/schemas/Domain'
+          $ref: '#/components/schemas/DomainCreatePayload'
         purchasePrice:
-          description: PurchasePrice is the price in USD for purchasing this domain for the minimum time period (typically 1 year). PurchasePrice is required if purchase_type is not "registration" or if it is a premium domain. If privacy_enabled is set, the regular price for whois protection will be added automatically. If VAT tax applies, it will also be added automatically.
+          description: PurchasePrice is the price in USD for purchasing this domain for the minimum time period (typically 1 year). PurchasePrice is required if purchaseType is not "registration" or if it is a premium domain. If privacyEnabled is set, the regular price for Whois Privacy protection will be added automatically. If VAT tax applies, it will also be added automatically.
           format: double
           type: number
         purchaseType:
-          description: PurchaseType defaults to "registration" but should be copied from the result of a search command otherwise.
+          description: PurchaseType defaults to "registration" but should be copied from the result of either a [Search](#operation/Search) or [checkAvailability](#operation/CheckAvailability) request.
           type: string
         tldRequirements:
           additionalProperties:
@@ -3900,8 +3961,8 @@ components:
           type: object
         years:
           description: |-
-            Years specifies how many years to register the domain for. Years defaults to the minimum time period (typically 1 year) if not passed and cannot be more than 10.  Some TLDs default to longer initial periods (e.g. .AI requires a 2 year registration).
-            If passing purchase_price make sure to adjust it accordingly.
+            Years specifies how many years to register the domain for. Years defaults to the minimum time period (typically 1 year) if not passed and cannot be more than 10. Some TLDs default to longer initial periods (e.g. .AI requires a 2 year registration).
+            If passing purchasePrice make sure to adjust it accordingly.
           format: int32
           type: integer
           example: 1
@@ -3910,16 +3971,19 @@ components:
       description: CreateDomainResponse contains the domain info as well as the order info for the created domain.
       properties:
         domain:
-          $ref: '#/components/schemas/Domain'
+          $ref: '#/components/schemas/DomainResponsePayload'
         order:
           description: Order is an identifier for this purchase.
           format: int32
           type: integer
         totalPaid:
-          description: TotalPaid is the total amount paid, including VAT and whois protection.
+          description: TotalPaid is the total amount paid, including VAT and Whois privacy protection.
           format: double
           type: number
       type: object
+      required:
+        - order
+        - totalPaid
     PaymentRequired402:
       type: object
       required:
@@ -4011,26 +4075,6 @@ components:
           items:
             $ref: '#/components/schemas/DNSSEC'
           type: array
-        lastPage:
-          description: LastPage is the identifier for the final page of results. It is only populated if there is another page of results after the current page.
-          format: int32
-          type: integer
-        nextPage:
-          description: NextPage is the identifier for the next page of results. It is only populated if there is another page of results after the current page.
-          format: int32
-          type: integer
-        totalCount:
-          description: TotalCount is total number of results.
-          format: int32
-          type: integer
-        from:
-          description: From specifies starting record number on current page.
-          format: int32
-          type: integer
-        to:
-          description: To specifies ending record number on current page.
-          format: int32
-          type: integer
       type: object
     CreateDNSSECBody:
       description: DNSSEC contains all the data required to create a DS record at the registry.
@@ -4188,6 +4232,9 @@ components:
       type: object
       required:
         - records
+        - to
+        - from
+        - totalCount
     DNSCreateRecordBody:
       description: Record is an individual DNS resource record.
       type: object
@@ -4483,6 +4530,8 @@ components:
           description: AuthCode is the authorization code needed to transfer a domain to another registrar. If you are storing auth codes, be sure to store them in a secure manner.
           type: string
       type: object
+      required:
+        - authCode
     PricingResponse:
       description: PricingResponse returns the Pricing related information from the GetPricingForDomain function.
       properties:
@@ -4493,15 +4542,23 @@ components:
           description: PurchasePrice is the price you will pay to register a domain. Can be passed in the CreateDomain request.
           format: double
           type: number
+          example: 24.99
         renewalPrice:
           description: RenewalPrice is the price you will pay to renew a domain. Can be passed in the RenewDomain request.
           format: double
           type: number
+          example: 24.99
         transferPrice:
           description: TransferPrice is the price you will pay to transfer a domain. Can be passed in the CreateTransfer request. The TransferPrice is always for 1 year regardless of the years input.
           format: double
           type: number
+          example: 24.99
       type: object
+      required:
+        - premium
+        - purchasePrice
+        - transferPrice
+        - renewalPrice
     DomainsPurchasePrivacyBody:
       description: PrivacyRequest passes the domain name as well as the purchase parameters to the PurchasePrivacy function.
       properties:
@@ -4518,7 +4575,7 @@ components:
       description: PrivacyResponse contains the updated domain info as well as the order info for the newly purchased Whois Privacy.
       properties:
         domain:
-          $ref: '#/components/schemas/Domain'
+          $ref: '#/components/schemas/DomainResponsePayload'
         order:
           description: Order is an identifier for this purchase.
           format: int32
@@ -4527,7 +4584,11 @@ components:
           description: TotalPaid is the total amount paid, including VAT.
           format: double
           type: number
+          example: 4.99
       type: object
+      required:
+        - order
+        - totalPaid
     DomainsRenewDomainBody:
       description: RenewDomainRequest passes the domain name and purchase parameters to the RenewDomain function.
       properties:
@@ -4537,10 +4598,12 @@ components:
             PurchasePrice is required if this is a premium domain.
           format: double
           type: number
+          example: 10.99
         years:
           description: Years specifies how many years to renew the domain for. Years defaults to the minimum time period (typically 1 year) if not passed and cannot be more than 10.  Some TLDs default to longer periods (e.g. .AI requires a 2 year renewal).
           format: int32
           type: integer
+          example: 3
       type: object
     RenewDomainResponse:
       description: RenewDomainResponse contains the updated domain info as well as the order info for the renewed domain.
@@ -4555,6 +4618,7 @@ components:
           description: TotalPaid is the total amount paid, including VAT.
           format: double
           type: number
+          example: 5.95
       type: object
     DomainsSetContactsBody:
       description: SetContactsRequest passes the contact info for each role to the SetContacts function.
@@ -4730,6 +4794,7 @@ components:
       properties:
         subscriptions:
           items:
+            description: Array of subscription objects. One for each event you have subscribed to.
             $ref: '#/components/schemas/SubscriptionRecord'
           type: array
       title: The response from listing all of the notifications you have subscribed to
@@ -4864,10 +4929,12 @@ components:
           description: TotalCapture is the amount captured.
           format: float
           type: number
+          example: 10.95
         totalRefund:
-          description: TotalRefund is the amount, if any, refunded.  Default is 0.00.  If 0.00, this field is not included in response.
+          description: TotalRefund is the amount, if any, refunded. Default is 0.00.
           format: float
           type: number
+          example: 10.95
       type: object
     ListOrdersResponse:
       description: ListOrdersResponse is the response from a list request, it contains the paginated list of Orders.
@@ -4904,6 +4971,9 @@ components:
       type: object
       required:
         - orders
+        - to
+        - from
+        - totalCount
     Transfer:
       description: Transfer contains all relevant data for a domain transfer to Name.com.
       type: object
@@ -4913,13 +4983,14 @@ components:
           type: string
           example: example.com
         email:
-          description: Email is the email address that the approval email was sent to. Not every TLD requries an approval email. This is usaully pulled from Whois.
+          description: Email is the email address that the approval email was sent to. Not every TLD requries an approval email. This is usually pulled from Whois.
           type: string
           format: email
           example: admin@example.com
         status:
           description: 'The current status of the transfer. Details about statuses can be found in the following Knowledge Base article: <https://www.name.com/support/articles/115012519688-transfer-status-faq>.'
           type: string
+          example: pending_transfer
       required:
         - domainName
         - status
@@ -4954,6 +5025,9 @@ components:
           type: array
       required:
         - transfers
+        - to
+        - from
+        - totalCount
     CreateTransferRequest:
       description: CreateTransferRequest passes the required transfer info to the CreateTransfer function.
       properties:
@@ -4979,6 +5053,7 @@ components:
       type: object
       required:
         - domainName
+        - authCode
     CreateTransferResponse:
       description: CreateTransferResponse returns the newly created transfer resource as well as the order information.
       properties:
