@@ -4,6 +4,12 @@ A Model Context Protocol (MCP) server that provides access to the Name.com API f
 
 > **⚠️ Experimental Tool**: This MCP server is currently experimental and defaults to Name.com's test environment (`api.dev.name.com`). While you can configure it to use the production environment, we recommend using the test environment for initial experimentation.
 
+## Feedback & Issues 🚀
+
+**We want your feedback!** This is an experimental tool and we're actively seeking user input to improve it.
+
+**[Share feedback, report bugs, or request features on GitHub Issues](https://github.com/namedotcom/namecom-mcp/issues)** - your input helps us prioritize improvements and ensure this tool meets real-world needs. No feedback is too small!
+
 ## Best Way to Use This Tool
 
 **Claude Desktop is the recommended way to use this MCP server.** It provides the most seamless experience for domain management tasks through natural conversation. The MCP Inspector is excellent for testing and debugging during development, and many other AI tools are announcing MCP support soon, which will expand the ways you can use this server!
@@ -140,8 +146,11 @@ NAME_TOKEN=your-name-com-api-token
      - "Search for available domains with the name 'example'"
      - "Show me the DNS records for my domain"
      - "Help me register a new domain"
+     - "What environment am I using?"
+     - "I'm having trouble with authentication"
    - Claude will ask for permission each time it tries to use a tool
    - The conversation flow feels natural and intuitive
+   - **No need to learn commands** - just describe what you want to do!
 
 ### Method 2: MCP Inspector (For Testing & Development)
 
@@ -198,6 +207,38 @@ Once configured, the MCP server will automatically generate tools for all availa
 ### Account Management
 - View account information
 - Check domain and service pricing
+
+### Getting Help
+
+The MCP server includes built-in help capabilities to assist you when things aren't working correctly:
+
+#### 🆘 Getting Help & Guidance
+Simply ask me in natural language:
+- **"Help me with Name.com"** or **"I need help with domain management"**
+- **"I'm having trouble with Name.com"** or **"Something isn't working"**
+- **"Show me some examples"** or **"What can I do with this?"**
+- **"What environment am I using?"** or **"Am I in test mode?"**
+
+#### 🔗 Support & Issue Reporting
+When you need to report problems or get official support:
+- **"How do I report an issue?"** or **"Where can I get support?"**
+- **"I want to request a feature"** or **"How do I give feedback?"**
+- **"Where's the documentation?"** or **"Show me the API docs"**
+
+#### 🌍 Environment & Status Checks
+To understand your current setup:
+- **"What environment am I using?"** - Check if you're in test or production mode
+- **"Am I in test mode?"** - Verify safety for experimentation
+- **"Is it safe to experiment?"** - Get recommendations for your current environment
+
+#### 💡 The Key: Just Talk Naturally!
+You don't need to memorize commands or tool names. Just describe what you want to do or what problem you're facing in plain English. The AI will:
+- Understand your intent
+- Use the appropriate tools behind the scenes
+- Give you helpful information and guidance
+- Connect you with the right support resources when needed
+
+**These help capabilities work even if your API credentials aren't configured or if there are connection issues with Name.com's API!**
 
 ## Available Tools
 
