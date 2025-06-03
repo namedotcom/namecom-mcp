@@ -187,7 +187,7 @@ describe('Tool Generator', () => {
       const result = await createToolsFromSpec(mockServer as any);
 
       expect(result).toBe(true);
-      expect(mockServer.tool).toHaveBeenCalledTimes(3); // GET domains, POST domains, GET hello
+      expect(mockServer.tool).toHaveBeenCalledTimes(6); // GET domains, POST domains, GET hello + 3 help tools
       
       // Verify GET endpoint tool creation
       expect(mockServer.tool).toHaveBeenCalledWith(
@@ -211,6 +211,27 @@ describe('Tool Generator', () => {
       // Verify Hello endpoint tool creation
       expect(mockServer.tool).toHaveBeenCalledWith(
         'Hello',
+        expect.objectContaining({}),
+        expect.any(Function)
+      );
+
+      // Verify help tools are created
+      expect(mockServer.tool).toHaveBeenCalledWith(
+        'namecom_help',
+        expect.objectContaining({
+          topic: expect.any(Object)
+        }),
+        expect.any(Function)
+      );
+
+      expect(mockServer.tool).toHaveBeenCalledWith(
+        'namecom_support_links',
+        expect.objectContaining({}),
+        expect.any(Function)
+      );
+
+      expect(mockServer.tool).toHaveBeenCalledWith(
+        'namecom_environment_status',
         expect.objectContaining({}),
         expect.any(Function)
       );

@@ -65,7 +65,7 @@ function setNestedProperty(obj, path, value) {
     current[keys[keys.length - 1]] = value;
 }
 import { callNameApi } from "./api-client.js";
-import { DEFAULT_VALUES } from "./config.js";
+import { DEFAULT_VALUES, NAME_API_URL } from "./config.js";
 /**
  * Create MCP tools from OpenAPI specification
  */
@@ -231,7 +231,225 @@ export async function createToolsFromSpec(server) {
             });
         }
     }
+    // Add static help tools
+    addHelpTools(server);
     return true;
+}
+/**
+ * Add help and support tools to the server
+ */
+function addHelpTools(server) {
+    // General help tool
+    server.tool('namecom_help', {
+        topic: z.string().optional().describe('Specific help topic (leave empty for general help)')
+    }, async (args) => {
+        const { topic } = args;
+        if (!topic || topic.toLowerCase() === 'general') {
+            const helpText = `# Name.com MCP Server Help
+
+This is an experimental MCP server that provides access to Name.com's domain management API.
+
+## Key Information:
+- **Environment**: Currently using ${NAME_API_URL.includes('dev') ? 'TEST/DEV' : 'PRODUCTION'} environment
+- **Safe to experiment**: ${NAME_API_URL.includes('dev') ? 'Yes! You\'re in the safe test environment.' : 'CAUTION: You\'re in production mode!'}
+
+## Common Operations:
+- **Domain Search**: "Search for available domains with name X"
+- **List Domains**: "List my domains" or "Show my domains"
+- **DNS Records**: "Show DNS records for domain X"
+- **Domain Registration**: "Register domain X" (test environment only)
+
+## Getting More Help:
+- **Troubleshooting**: Say "I'm having trouble with Name.com" or "Help me troubleshoot issues"
+- **Examples**: Ask "Show me some examples" or "What can I do with this?"  
+- **Support**: Ask "How do I report an issue?" or "Where can I get support?"
+
+## Available Operations:
+This server automatically generates capabilities from Name.com's API. You can ask me about domain management in natural language - I'll handle the technical details behind the scenes.
+
+**Just talk to me naturally!** You don't need to know specific command names.
+
+Environment: ${NAME_API_URL.includes('dev') ? 'test' : 'production'}
+Safe to experiment: ${NAME_API_URL.includes('dev')}`;
+            return {
+                content: [{
+                        type: "text",
+                        text: helpText
+                    }]
+            };
+        }
+        if (topic.toLowerCase() === 'troubleshooting') {
+            const troubleshootingText = `# Troubleshooting Name.com MCP Server
+
+## Common Issues:
+
+### Authentication Errors:
+- **Problem**: "Authentication failed" or "Invalid credentials"
+- **What to say**: "I'm getting authentication errors" or "My credentials aren't working"
+- **Solution**: 
+  1. Verify your NAME_USERNAME and NAME_TOKEN environment variables
+  2. Check that your API token is active in your Name.com account
+  3. Ensure you're using the correct environment (test vs production)
+
+### API Rate Limits:
+- **Problem**: "Rate limit exceeded" or "Too many requests"
+- **What to say**: "I'm hitting rate limits" or "Getting too many requests errors"
+- **Solution**: Wait a few minutes before retrying. Name.com has rate limits to protect their API.
+
+### Permission Errors:
+- **Problem**: "Access denied" or "Insufficient permissions"
+- **What to say**: "I'm getting permission denied errors"
+- **Solution**: Check that your API token has the necessary permissions in your Name.com account settings.
+
+### Operations Not Working:
+- **Problem**: Specific operation isn't working
+- **What to say**: "This isn't working" or "I can't do X" - be specific about what you're trying to do
+- **Solution**: Try describing what you want in natural language. I'll figure out the right way to do it.
+
+### Environment Confusion:
+- **Problem**: "My real domains don't show up"
+- **What to say**: "What environment am I using?" or "Am I in test mode?"
+- **Solution**: Ask me to check your environment status - you might be in test mode.
+
+## Still Having Issues?
+Just say: "How do I report this issue?" or "Where can I get support?" and I'll help you find the right channels.
+
+Current environment: ${NAME_API_URL.includes('dev') ? 'test/development' : 'production'}`;
+            return {
+                content: [{
+                        type: "text",
+                        text: troubleshootingText
+                    }]
+            };
+        }
+        if (topic.toLowerCase() === 'examples') {
+            const examplesText = `# Name.com MCP Server Examples
+
+## What You Can Say:
+
+### Domain Search Examples:
+- "Search for available domains with the name 'mycompany'"
+- "Check if example123.com is available"
+- "Find available .dev domains with 'startup' in the name"
+- "Show me .com alternatives for 'mybusiness'"
+
+### Domain Management Examples:
+- "List all my domains"
+- "Show me details for example.com"
+- "When does my domain expire?"
+- "What domains do I own?"
+
+### DNS Examples:
+- "Show me the DNS records for example.com"
+- "List the nameservers for my domain"
+- "What A records exist for example.com?"
+- "Add a CNAME record for www pointing to example.com"
+
+### Account & Billing Examples:
+- "Show my account information"
+- "What's the pricing for .com domains?"
+- "How much does it cost to renew example.com?"
+
+## How to Talk to Me:
+- **Be conversational**: "Can you help me find available domains?"
+- **Be specific**: Include domain names, record types, or other details
+- **Ask follow-ups**: "Now show me the DNS records for that domain"
+- **Express intent clearly**: "I want to register a domain" vs "I want to check if it's available"
+
+## Test Environment Safety:
+${NAME_API_URL.includes('dev') ?
+                '✅ You\'re in the safe test environment - feel free to experiment!' :
+                '⚠️  You\'re in production mode - be careful with destructive operations!'}
+
+💡 **Pro tip**: Just describe what you want to do in plain English. I'll translate that into the right API calls automatically!`;
+            return {
+                content: [{
+                        type: "text",
+                        text: examplesText
+                    }]
+            };
+        }
+        return {
+            content: [{
+                    type: "text",
+                    text: `Unknown help topic: ${topic}\n\nAvailable topics: general, troubleshooting, examples`
+                }]
+        };
+    });
+    // Support and issue reporting tool
+    server.tool('namecom_support_links', {}, async () => {
+        const supportText = `# Name.com MCP Server Support
+
+## 🐛 Report Issues or Request Features:
+**GitHub Issues**: https://github.com/namedotcom/namecom-mcp/issues
+
+## ✨ Share Feedback:
+We want your feedback! This is an experimental tool and your input helps us improve it.
+**GitHub Issues**: https://github.com/namedotcom/namecom-mcp/issues
+
+## 📚 Documentation:
+**README**: https://github.com/namedotcom/namecom-mcp#readme
+
+## 🔧 Name.com API Documentation:
+**API Docs**: https://docs.name.com
+
+## 💬 Community:
+- Check existing issues before creating new ones
+- Include error messages and steps to reproduce issues
+- Mention your environment (test vs production)
+- Share your use case - it helps us prioritize features!
+
+## Quick Links:
+- **Report Bug**: https://github.com/namedotcom/namecom-mcp/issues/new?template=bug_report.md
+- **Request Feature**: https://github.com/namedotcom/namecom-mcp/issues/new?template=feature_request.md
+- **General Feedback**: https://github.com/namedotcom/namecom-mcp/issues/new
+- **Documentation**: https://github.com/namedotcom/namecom-mcp#readme
+
+Current environment: ${NAME_API_URL.includes('dev') ? 'test/development' : 'production'}
+
+## Getting Support - Just Ask Me:
+- **"How do I report a bug?"** - I'll give you the bug report link
+- **"I want to request a feature"** - I'll show you how to request features  
+- **"Where's the documentation?"** - I'll point you to the docs
+- **"I need help with the Name.com API"** - I'll give you API documentation
+- **"Who can I contact for support?"** - I'll help you find the right channels
+
+## Tips for Reporting Issues:
+- Include error messages and steps to reproduce when reporting bugs
+- Check existing issues first - your question might already be answered
+- Mention if you're using test or production environment
+- No feedback is too small - we appreciate all input!`;
+        return {
+            content: [{
+                    type: "text",
+                    text: supportText
+                }]
+        };
+    });
+    // Environment status tool
+    server.tool('namecom_environment_status', {}, async () => {
+        const statusText = `# Name.com MCP Server Environment Status
+
+**Environment**: ${NAME_API_URL.includes('dev') ? 'test/development' : 'production'}
+**API URL**: ${NAME_API_URL}
+**Safe to experiment**: ${NAME_API_URL.includes('dev') ? 'Yes' : 'No'}
+
+## Current Status:
+${NAME_API_URL.includes('dev') ?
+            '✅ You are in the safe test environment. Feel free to experiment!' :
+            '⚠️  CAUTION: You are in production mode. Real operations will affect your actual domains and account.'}
+
+## Recommendation:
+${NAME_API_URL.includes('dev') ?
+            'Perfect for learning and testing the MCP server capabilities.' :
+            'Double-check all operations before confirming. Consider switching to test environment for experimentation.'}`;
+        return {
+            content: [{
+                    type: "text",
+                    text: statusText
+                }]
+        };
+    });
 }
 /**
  * Create fallback tools when OpenAPI spec loading fails
@@ -259,4 +477,6 @@ export function createFallbackTools(server) {
             };
         }
     });
+    // Add help tools even in fallback mode
+    addHelpTools(server);
 }
