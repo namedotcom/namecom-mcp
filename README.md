@@ -27,8 +27,6 @@ A Model Context Protocol (MCP) server that provides access to the Name.com API f
 
 ## Installation
 
-### Quick Start (Recommended)
-
 The easiest way to get started - no building required!
 
 ```bash
@@ -36,17 +34,6 @@ npm install -g namecom-mcp
 ```
 
 That's it! The package comes pre-compiled and ready to use.
-
-### From Source (For Development)
-
-Only needed if you want to modify the code:
-
-```bash
-git clone https://github.com/namedotcom/namecom-mcp.git
-cd namecom-mcp
-npm install
-npm run build
-```
 
 ## Configuration
 
@@ -267,41 +254,6 @@ The server dynamically generates tools based on the Name.com OpenAPI specificati
 - **Input Validation**: All inputs are validated using Zod schemas
 - **Error Handling**: Errors are handled gracefully without exposing sensitive information
 
-## Development
-
-### For Contributors and Developers
-
-Building from source is only needed if you want to modify the code or contribute to the project.
-
-```bash
-git clone https://github.com/namedotcom/namecom-mcp.git
-cd namecom-mcp
-npm install
-npm run build
-```
-
-### Running in Development Mode
-
-```bash
-npm run dev
-```
-
-### Project Structure
-
-```
-src/
-├── index.ts           # Main entry point
-├── config.ts          # Configuration and environment variables
-├── api-client.ts      # Name.com API client
-├── tool-generator.ts  # Dynamic tool generation from OpenAPI spec
-├── openapi-utils.ts   # OpenAPI specification utilities
-└── types.ts           # TypeScript type definitions
-```
-
-### Publishing
-
-The package is automatically built before publishing thanks to the `prepublishOnly` script. The published package includes the compiled `dist` directory, so users don't need to build anything.
-
 ## Troubleshooting
 
 ### Common Issues
@@ -335,14 +287,6 @@ If you run into issues:
 2. Test with the MCP Inspector first to isolate configuration issues
 3. Verify your credentials work with Name.com's API directly
 4. Open an issue on GitHub with detailed error messages
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
 
 ## License
 
