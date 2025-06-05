@@ -25,6 +25,8 @@ stages:
 test:
   <<: *node_job
   stage: test
+  tags:
+    - docker_runner-build
   parallel:
     matrix:
       - NODE_VERSION: ["17", "18", "20", "22"]
@@ -50,6 +52,8 @@ security_audit:
   image: node:20
   <<: *node_cache
   stage: security
+  tags:
+    - docker_runner-build
   script:
     - npm audit --audit-level=moderate
   allow_failure: true
@@ -81,6 +85,8 @@ sync_to_github:
 publish_npm:
   stage: deploy
   image: node:20
+  tags:
+    - docker_runner-build
   variables:
     GIT_STRATEGY: clone
     NPM_CONFIG_REGISTRY: "https://registry.npmjs.org"
