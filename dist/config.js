@@ -23,7 +23,7 @@ You can either:
 2. Set them in your Claude Desktop configuration
 3. Export them in your shell
 
-For more information, see: https://github.com/yourusername/name-com-mcp#configuration
+For more information, see: https://github.com/namedotcom/namecom-mcp#configuration
 `);
     process.exit(1);
 }

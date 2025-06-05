@@ -1,3 +1,4 @@
+import { fetch } from "undici";
 import { NameApiResponse, FetchOptions } from "./types.js";
 import { NAME_USERNAME, NAME_TOKEN, NAME_API_URL } from "./config.js";
 

@@ -22,7 +22,7 @@ export default {
     "!src/index.ts", // Main entry point, tested via integration
   ],
   coverageDirectory: "coverage",
-  coverageReporters: ["text", "lcov", "html"],
+  coverageReporters: ["text", "lcov", "html", "cobertura"],
   setupFilesAfterEnv: ["<rootDir>/tests/setup.ts"],
   testTimeout: 10000,
 };

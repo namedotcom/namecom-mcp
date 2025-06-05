@@ -1,0 +1,97 @@
+# GitLab CI configuration for MCP Server
+stages:
+  - test
+  - security
+  - deploy
+
+# Cache node_modules for faster builds
+.node_cache: &node_cache
+  cache:
+    key: 
+      files:
+        - package-lock.json
+    paths:
+      - node_modules/
+    policy: pull-push
+
+# Template for Node.js jobs
+.node_job: &node_job
+  image: node:${NODE_VERSION}
+  <<: *node_cache
+  before_script:
+    - npm ci
+
+# Test job that runs on multiple Node.js versions
+test:
+  <<: *node_job
+  stage: test
+  parallel:
+    matrix:
+      - NODE_VERSION: ["17", "18", "20", "22"]
+  script:
+    - npm run lint --if-present
+    - npm run build
+    - npm run test:ci
+  coverage: '/All files[^|]*\|[^|]*\s+([\d\.]+)/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage/cobertura-coverage.xml
+    paths:
+      - coverage/
+    expire_in: 1 week
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "default"
+
+# Security audit job
+security_audit:
+  image: node:20
+  <<: *node_cache
+  stage: security
+  script:
+    - npm audit --audit-level=moderate
+  allow_failure: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "default"
+
+
+# Sync to GitHub only on release tags
+sync_to_github:
+  stage: deploy
+  image: alpine/git
+  variables:
+    GIT_STRATEGY: clone
+    GIT_DEPTH: 0
+  script:
+    - git config --global user.email "ci@name.systems"
+    - git config --global user.name "GitLab CI"
+    - git remote add github https://${GITHUB_TOKEN}@github.com/namedotcom/namecom-mcp.git
+    - git push github HEAD:main --force-with-lease
+    - git push github --tags --force-with-lease
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+  needs:
+    - test
+    - security_audit
+
+# Publish to npm on release tags
+publish_npm:
+  stage: deploy
+  image: node:20
+  variables:
+    GIT_STRATEGY: clone
+    NPM_CONFIG_REGISTRY: "https://registry.npmjs.org"
+  script:
+    - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+    - npm ci
+    - npm run build
+    - npm run test:ci
+    - npm publish
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+  needs:
+    - test
+    - security_audit 

@@ -21,8 +21,10 @@ export function getGlobalSpec() {
  */
 export async function loadOpenApiSpec() {
     try {
-        // Use relative path from project root
-        const specPath = path.resolve(process.cwd(), 'assets/namecom.api.yaml');
+        // Use path relative to this file's directory instead of process.cwd()
+        // This ensures it works regardless of where the process is started from
+        const __dirname = path.dirname(new URL(import.meta.url).pathname);
+        const specPath = path.resolve(__dirname, '..', 'assets/namecom.api.yaml');
         const yamlContent = await fs.readFile(specPath, 'utf8');
         const loadedSpec = load(yamlContent);
         // Store the loaded spec to resolve references later
