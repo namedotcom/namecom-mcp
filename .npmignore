@@ -1,0 +1,30 @@
+# Development files
+src/
+tests/
+coverage/
+node_modules/
+
+# Configuration files
+.gitlab-ci.yml
+jest.config.js
+tsconfig.json
+tsconfig.test.json
+.gitignore
+.git/
+
+# Logs and temporary files
+*.log
+.DS_Store
+.env
+.env.local
+.env.*.local
+
+# IDE/Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test and development artifacts
+*.tgz
+.nyc_output/ 
