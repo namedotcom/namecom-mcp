@@ -45,7 +45,6 @@ test:
     expire_in: 1 week
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == "default"
 
 # Security audit job
 security_audit:
@@ -59,7 +58,6 @@ security_audit:
   allow_failure: false
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == "default"
 
 # Sync to GitHub (NPM publishing temporarily disabled for testing)
 sync_to_github:
