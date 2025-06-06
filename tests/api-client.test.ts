@@ -5,9 +5,11 @@ jest.mock('../src/config.js', () => ({
   NAME_API_URL: 'https://api.dev.name.com'
 }));
 
-// Mock fetch globally before importing any modules
+// Mock undici fetch before importing any modules
 const mockFetch = jest.fn();
-global.fetch = mockFetch as any;
+jest.mock('undici', () => ({
+  fetch: mockFetch
+}));
 
 import { callNameApi } from '../src/api-client.js';
 

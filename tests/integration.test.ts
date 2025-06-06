@@ -1,6 +1,8 @@
-// Mock fetch globally before importing any modules
-const mockFetch = jest.fn();
-global.fetch = mockFetch as any;
+// Mock undici fetch before importing any modules
+const mockFetchGlobal = jest.fn();
+jest.mock('undici', () => ({
+  fetch: mockFetchGlobal
+}));
 
 // Mock config
 jest.mock('../src/config.js', () => ({
@@ -10,10 +12,6 @@ jest.mock('../src/config.js', () => ({
 }));
 
 import { callNameApi } from '../src/api-client.js';
-
-// Mock fetch globally
-const mockFetchGlobal = jest.fn();
-global.fetch = mockFetchGlobal as any;
 
 describe('Name.com API Integration Tests', () => {
   beforeEach(() => {

@@ -1,3 +1,4 @@
+import { fetch } from "undici";
 import { NAME_USERNAME, NAME_TOKEN, NAME_API_URL } from "./config.js";
 /**
  * Helper function to make authenticated requests to Name.com API

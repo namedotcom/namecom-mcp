@@ -1,11 +1,23 @@
 import dotenv from "dotenv";
 import path from "path";
-import { fileURLToPath } from "url";
 
-// Setup environment
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.resolve(__dirname, "../.env") });
+// Setup environment - try multiple possible .env locations
+const possibleEnvPaths = [
+  // For development/testing: from current working directory
+  path.resolve(process.cwd(), '.env'),
+  // For installed package: one level up from dist
+  path.resolve(process.cwd(), '..', '.env'),
+];
+
+// Try to load .env file from any of the possible locations
+for (const envPath of possibleEnvPaths) {
+  try {
+    dotenv.config({ path: envPath });
+    break; // Stop if successful
+  } catch {
+    // Continue to next path
+  }
+}
 
 // Name.com API credentials
 export const NAME_USERNAME = process.env.NAME_USERNAME;
@@ -26,7 +38,7 @@ You can either:
 2. Set them in your Claude Desktop configuration
 3. Export them in your shell
 
-For more information, see: https://github.com/yourusername/name-com-mcp#configuration
+For more information, see: https://github.com/namedotcom/namecom-mcp#configuration
 `);
   process.exit(1);
 }
