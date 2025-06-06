@@ -61,8 +61,8 @@ security_audit:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == "default"
 
-# Sync to GitHub and publish to NPM on release tags
-release_to_github_and_npm:
+# Sync to GitHub (NPM publishing temporarily disabled for testing)
+sync_to_github:
   stage: deploy
   image: node:20
   tags:
@@ -75,7 +75,8 @@ release_to_github_and_npm:
     - git config --global user.email "ci@name.systems"
     - git config --global user.name "GitLab CI"
     - git remote add github https://oauth2:${GITHUB_TOKEN}@github.com/namedotcom/namecom-mcp.git
-    - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+    # NPM setup commented out for testing
+    # - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
   script:
     # Build and test
     - npm run build
@@ -84,9 +85,11 @@ release_to_github_and_npm:
     - echo "Syncing tag ${CI_COMMIT_TAG} to GitHub..."
     - git push github HEAD:main --force-with-lease
     - git push github ${CI_COMMIT_TAG}
-    # Publish to NPM
-    - echo "Publishing version ${CI_COMMIT_TAG} to NPM..."
-    - npm publish --access public
+    - echo "✅ Successfully synced to GitHub!"
+    # NPM publishing commented out for testing
+    # - echo "Publishing version ${CI_COMMIT_TAG} to NPM..."
+    # - npm publish --access public
+    - echo "ℹ️  NPM publishing is disabled for testing. Enable it later in .gitlab-ci.yml"
   rules:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
   needs:
