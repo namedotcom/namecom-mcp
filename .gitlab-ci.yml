@@ -74,7 +74,7 @@ sync_to_github:
     - npm ci
     - git config --global user.email "ci@name.systems"
     - git config --global user.name "GitLab CI"
-    - git remote add github https://oauth2:${GITHUB_TOKEN}@github.com/namedotcom/namecom-mcp.git
+    - git remote add github https://${GITHUB_TOKEN}@github.com/namedotcom/namecom-mcp.git
     # NPM setup commented out for testing
     # - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
   script:
