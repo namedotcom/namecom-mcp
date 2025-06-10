@@ -74,9 +74,8 @@ sync_to_github:
     - npm ci
     - git config --global user.email "ci@name.systems"
     - git config --global user.name "GitLab CI"
-    # Debug: Check if variables are set
-    - echo "GITHUB_USERNAME is: ${GITHUB_USERNAME}"
-    - echo "GITHUB_TOKEN length: ${#GITHUB_TOKEN}"
+    - echo "Debug - GITHUB_USERNAME is: ${GITHUB_USERNAME}"
+    - echo "Debug - GITHUB_TOKEN length: ${#GITHUB_TOKEN}"
     - git remote add github https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/namedotcom/namecom-mcp
     # NPM setup commented out for testing
     # - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
