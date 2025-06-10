@@ -20,7 +20,30 @@ for (const envPath of possibleEnvPaths) {
 // Name.com API credentials
 export const NAME_USERNAME = process.env.NAME_USERNAME;
 export const NAME_TOKEN = process.env.NAME_TOKEN;
-export const NAME_API_URL = process.env.NAME_API_URL || "https://api.dev.name.com";
+// Validate and set API URL - only allow MCP routes
+function validateAndSetApiUrl() {
+    const providedUrl = process.env.NAME_API_URL || "https://mcp.dev.name.com";
+    // Allowed MCP URLs
+    const allowedUrls = [
+        "https://mcp.dev.name.com",
+        "https://mcp.name.com"
+    ];
+    // Check if the provided URL is in the allowed list
+    if (!allowedUrls.includes(providedUrl)) {
+        process.stderr.write(`
+Error: Invalid NAME_API_URL provided: ${providedUrl}
+
+Please use one of the supported endpoints:
+- https://mcp.dev.name.com (development - default)
+- https://mcp.name.com (production)
+
+Update your NAME_API_URL environment variable accordingly.
+`);
+        process.exit(1);
+    }
+    return providedUrl;
+}
+export const NAME_API_URL = validateAndSetApiUrl();
 // Validate required credentials
 if (!NAME_USERNAME || !NAME_TOKEN) {
     process.stderr.write(`
