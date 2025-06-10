@@ -74,8 +74,6 @@ sync_to_github:
     - npm ci
     - git config --global user.email "ci@name.systems"
     - git config --global user.name "GitLab CI"
-    - echo "Debug - GITHUB_USERNAME is ${GITHUB_USERNAME}"
-    - echo "Debug - GITHUB_TOKEN is set" && test -n "${GITHUB_TOKEN}"
     - git remote add github https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/namedotcom/namecom-mcp
   script:
     # Build and test
@@ -83,7 +81,7 @@ sync_to_github:
     - npm run test:ci
     # Sync to GitHub
     - echo "Syncing tag ${CI_COMMIT_TAG} to GitHub..."
-    - git push github HEAD:main --force-with-lease
+    - git push github HEAD:main --force
     - git push github ${CI_COMMIT_TAG}
     - echo "✅ Successfully synced to GitHub!"
     # NPM publishing commented out for testing
