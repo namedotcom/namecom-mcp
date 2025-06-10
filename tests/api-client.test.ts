@@ -2,7 +2,7 @@
 jest.mock('../src/config.js', () => ({
   NAME_USERNAME: 'test-username',
   NAME_TOKEN: 'test-token',
-  NAME_API_URL: 'https://api.dev.name.com'
+  NAME_API_URL: 'https://mcp.dev.name.com'
 }));
 
 // Mock undici fetch before importing any modules
@@ -31,7 +31,7 @@ describe('API Client', () => {
       const result = await callNameApi('/core/v1/domains');
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.dev.name.com/core/v1/domains',
+        'https://mcp.dev.name.com/core/v1/domains',
         expect.objectContaining({
           method: 'GET',
           headers: expect.objectContaining({
@@ -56,7 +56,7 @@ describe('API Client', () => {
       const result = await callNameApi('/core/v1/domains', 'POST', requestBody);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.dev.name.com/core/v1/domains',
+        'https://mcp.dev.name.com/core/v1/domains',
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify(requestBody),
@@ -102,7 +102,7 @@ describe('API Client', () => {
       await callNameApi('/core/v1/domains', 'POST', requestBody);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.dev.name.com/core/v1/domains',
+        'https://mcp.dev.name.com/core/v1/domains',
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify(requestBody)
@@ -121,7 +121,7 @@ describe('API Client', () => {
       await callNameApi('/core/v1/domains', 'GET');
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.dev.name.com/core/v1/domains',
+        'https://mcp.dev.name.com/core/v1/domains',
         expect.objectContaining({
           method: 'GET',
           headers: expect.objectContaining({
@@ -159,7 +159,7 @@ describe('API Client', () => {
         await callNameApi('/core/v1/domains', method);
 
         expect(mockFetch).toHaveBeenLastCalledWith(
-          'https://api.dev.name.com/core/v1/domains',
+          'https://mcp.dev.name.com/core/v1/domains',
           expect.objectContaining({ method })
         );
       }
@@ -176,7 +176,7 @@ describe('API Client', () => {
       await callNameApi('/core/v1/domains/test.com');
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.dev.name.com/core/v1/domains/test.com',
+        'https://mcp.dev.name.com/core/v1/domains/test.com',
         expect.any(Object)
       );
     });

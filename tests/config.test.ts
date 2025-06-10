@@ -2,7 +2,7 @@
 jest.mock('../src/config.js', () => ({
   NAME_USERNAME: 'test-username',
   NAME_TOKEN: 'test-token', 
-  NAME_API_URL: 'https://api.dev.name.com',
+  NAME_API_URL: 'https://mcp.dev.name.com',
   DEFAULT_VALUES: {
     perPage: 1000,
     page: 1,
@@ -21,7 +21,7 @@ describe('Configuration', () => {
     
     expect(config.NAME_USERNAME).toBe('test-username');
     expect(config.NAME_TOKEN).toBe('test-token');
-    expect(config.NAME_API_URL).toBe('https://api.dev.name.com');
+    expect(config.NAME_API_URL).toBe('https://mcp.dev.name.com');
   });
 
   it('should export default values for API parameters', async () => {
