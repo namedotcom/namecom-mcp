@@ -3,7 +3,7 @@
 // Set up test environment variables
 process.env.NAME_USERNAME = 'test-username';
 process.env.NAME_TOKEN = 'test-token';
-process.env.NAME_API_URL = 'https://api.dev.name.com';
+process.env.NAME_API_URL = 'https://mcp.dev.name.com';
 
 // Global test timeout
 jest.setTimeout(10000);

@@ -13,7 +13,7 @@ jest.mock('../src/api-client.js', () => ({
 jest.mock('../src/config.js', () => ({
   NAME_USERNAME: 'test-username',
   NAME_TOKEN: 'test-token',
-  NAME_API_URL: 'https://api.dev.name.com'
+  NAME_API_URL: 'https://mcp.dev.name.com'
 }));
 
 import { createToolsFromSpec, createFallbackTools } from '../src/tool-generator.js';

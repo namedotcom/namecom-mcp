@@ -8,7 +8,7 @@ jest.mock('undici', () => ({
 jest.mock('../src/config.js', () => ({
   NAME_USERNAME: 'test-username',
   NAME_TOKEN: 'test-token',
-  NAME_API_URL: 'https://api.dev.name.com'
+  NAME_API_URL: 'https://mcp.dev.name.com'
 }));
 
 import { callNameApi } from '../src/api-client.js';
@@ -36,7 +36,7 @@ describe('Name.com API Integration Tests', () => {
       const result = await callNameApi('/core/v1/domains');
 
       expect(mockFetchGlobal).toHaveBeenCalledWith(
-        'https://api.dev.name.com/core/v1/domains',
+        'https://mcp.dev.name.com/core/v1/domains',
         expect.objectContaining({
           method: 'GET',
           headers: expect.objectContaining({
@@ -71,7 +71,7 @@ describe('Name.com API Integration Tests', () => {
       });
 
       expect(mockFetchGlobal).toHaveBeenCalledWith(
-        'https://api.dev.name.com/core/v1/domains:search',
+        'https://mcp.dev.name.com/core/v1/domains:search',
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify({ keyword: 'available-domain' }),
@@ -105,7 +105,7 @@ describe('Name.com API Integration Tests', () => {
       const result = await callNameApi('/core/v1/domains/example.com');
 
       expect(mockFetchGlobal).toHaveBeenCalledWith(
-        'https://api.dev.name.com/core/v1/domains/example.com',
+        'https://mcp.dev.name.com/core/v1/domains/example.com',
         expect.objectContaining({
           method: 'GET',
           headers: expect.objectContaining({
@@ -196,7 +196,7 @@ describe('Name.com API Integration Tests', () => {
       });
 
       expect(mockFetchGlobal).toHaveBeenCalledWith(
-        'https://api.dev.name.com/core/v1/domains/example.com/records',
+        'https://mcp.dev.name.com/core/v1/domains/example.com/records',
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify({
@@ -261,7 +261,7 @@ describe('Name.com API Integration Tests', () => {
       const result = await callNameApi('/core/v1/domains/example.com/records/1', 'DELETE');
 
       expect(mockFetchGlobal).toHaveBeenCalledWith(
-        'https://api.dev.name.com/core/v1/domains/example.com/records/1',
+        'https://mcp.dev.name.com/core/v1/domains/example.com/records/1',
         expect.objectContaining({
           method: 'DELETE',
           headers: expect.objectContaining({
@@ -344,7 +344,7 @@ describe('Name.com API Integration Tests', () => {
         }),
         headers: new Map([
           ['content-type', 'application/json'],
-          ['Link', '<https://api.dev.name.com/core/v1/domains?page=2>; rel="next"']
+          ['Link', '<https://mcp.dev.name.com/core/v1/domains?page=2>; rel="next"']
         ])
       });
 
@@ -371,7 +371,7 @@ describe('Name.com API Integration Tests', () => {
       await callNameApi('/core/v1/domains?sort=expireDate&dir=asc&filter=example');
 
       expect(mockFetchGlobal).toHaveBeenCalledWith(
-        'https://api.dev.name.com/core/v1/domains?sort=expireDate&dir=asc&filter=example',
+        'https://mcp.dev.name.com/core/v1/domains?sort=expireDate&dir=asc&filter=example',
         expect.any(Object)
       );
     });
