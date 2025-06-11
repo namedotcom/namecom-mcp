@@ -310,7 +310,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ## Support
 
 - **Issues**: Report bugs and feature requests on [GitHub Issues](https://github.com/namedotcom/namecom-mcp/issues)
-- **Documentation**: See the [Name.com API Documentation](https://www.name.com/api-docs) for API details
+- **Documentation**: See the [Name.com API Documentation](https://docs.name.com) for API details
 - **MCP Protocol**: Learn more about [Model Context Protocol](https://modelcontextprotocol.io/)
 
 ## Changelog
