@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "type": "module",
   "bin": {
-    "name-com-mcp": "dist/index.js"
+    "namecom-mcp": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",

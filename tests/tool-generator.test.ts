@@ -187,7 +187,7 @@ describe('Tool Generator', () => {
       const result = await createToolsFromSpec(mockServer as any);
 
       expect(result).toBe(true);
-      expect(mockServer.tool).toHaveBeenCalledTimes(3); // GET domains, POST domains, GET hello
+      expect(mockServer.tool).toHaveBeenCalledTimes(6); // GET domains, POST domains, GET hello + 3 help tools
       
       // Verify GET endpoint tool creation
       expect(mockServer.tool).toHaveBeenCalledWith(

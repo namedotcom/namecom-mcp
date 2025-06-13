@@ -13,13 +13,11 @@ async function main() {
     const success = await createToolsFromSpec(server);
     // Fallback to basic implementation if spec loading fails
     if (!success) {
-        // Don't use console.warn as it interferes with MCP protocol
         createFallbackTools(server);
     }
     // Start the server
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    // Don't use console.log as it interferes with MCP protocol
 }
 // Start the server and handle any fatal errors
 main().catch(error => {
