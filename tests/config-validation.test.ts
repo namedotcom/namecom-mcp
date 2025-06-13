@@ -55,13 +55,13 @@ describe('Config URL Validation', () => {
   it('should reject old API dev URL', async () => {
     process.env.NAME_USERNAME = 'test-user';
     process.env.NAME_TOKEN = 'test-token';
-    process.env.NAME_API_URL = 'https://api.dev.name.com';
+    process.env.NAME_API_URL = 'https://mcp.dev.name.com';
 
     await import('../src/config.js');
     
     expect(process.exit).toHaveBeenCalledWith(1);
     expect(process.stderr.write).toHaveBeenCalledWith(
-      expect.stringContaining('Invalid NAME_API_URL provided: https://api.dev.name.com')
+      expect.stringContaining('Invalid NAME_API_URL provided: https://mcp.dev.name.com')
     );
     expect(process.stderr.write).toHaveBeenCalledWith(
       expect.stringContaining('Please use one of the supported endpoints')
@@ -71,13 +71,13 @@ describe('Config URL Validation', () => {
   it('should reject old API production URL', async () => {
     process.env.NAME_USERNAME = 'test-user';
     process.env.NAME_TOKEN = 'test-token';
-    process.env.NAME_API_URL = 'https://api.name.com';
+    process.env.NAME_API_URL = 'https://mcp.name.com';
 
     await import('../src/config.js');
     
     expect(process.exit).toHaveBeenCalledWith(1);
     expect(process.stderr.write).toHaveBeenCalledWith(
-      expect.stringContaining('Invalid NAME_API_URL provided: https://api.name.com')
+      expect.stringContaining('Invalid NAME_API_URL provided: https://mcp.name.com')
     );
   });
 

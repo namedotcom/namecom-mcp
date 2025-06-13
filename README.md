@@ -2,7 +2,7 @@
 
 A Model Context Protocol (MCP) server that provides access to the Name.com API for domain management operations. This server automatically generates tools from the Name.com OpenAPI specification, allowing AI assistants to interact with domain registration, DNS management, and other Name.com services.
 
-> **⚠️ Experimental Tool**: This MCP server is currently experimental and defaults to Name.com's test environment (`api.dev.name.com`). While you can configure it to use the production environment, we recommend using the test environment for initial experimentation.
+> **⚠️ Experimental Tool**: This MCP server is currently experimental and defaults to Name.com's test environment (`mcp.dev.name.com`). While you can configure it to use the production environment, we recommend using the test environment for initial experimentation.
 
 ## Best Way to Use This Tool
 
@@ -12,8 +12,8 @@ A Model Context Protocol (MCP) server that provides access to the Name.com API f
 
 - 🔄 **Dynamic Tool Generation**: Automatically creates MCP tools from Name.com's OpenAPI specification
 - 🛡️ **Secure Authentication**: Uses Name.com API credentials with proper authentication
-- 📝 **Comprehensive API Coverage**: Supports all Name.com API endpoints including domains, DNS, SSL certificates, and more
-- 🔧 **Flexible Configuration**: Easy setup through environment variables or Claude Desktop configuration
+- 📝 **Comprehensive API Coverage**: Supports all Name.com API endpoints including domains, DNS, and more
+- 🔧 **Flexible Configuration**: Simple integration with AI tools like Claude Desktop or local development
 - 📊 **Rich Parameter Support**: Handles complex nested objects, arrays, and all parameter types
 - 🚨 **Error Handling**: Robust error handling with informative error messages
 - 🧪 **Test Environment**: Defaults to safe test environment for experimentation
@@ -29,7 +29,7 @@ The easiest way to get started - no building required!
 npm install -g namecom-mcp
 ```
 
-That's it! The package comes pre-compiled and ready to use.
+That's it! The package comes pre-compiled and ready to use. Follow configuration for next steps.
 
 ### From Source (For Development)
 
@@ -52,30 +52,18 @@ You'll need Name.com API credentials:
 2. Go to Account Settings > API Access
 3. Generate an API token
 4. Note your username and the generated token
+5. Make sure you are using the correct credentials for your configured environment (dev vs prod)
 
 ### Claude Desktop Setup (Recommended)
 
-Add the following to your Claude Desktop configuration file:
+Add the following to your Claude Desktop configuration file. Default Claude config location:
 
 **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 
-```json
-{
-  "mcpServers": {
-    "namecom": {
-      "command": "npx",
-      "args": ["namecom-mcp"],
-      "env": {
-        "NAME_USERNAME": "your-name-com-username",
-        "NAME_TOKEN": "your-name-com-api-token"
-      }
-    }
-  }
-}
-```
+If you cannot locate this file through your filesystem, you can access it through Claude Desktop Settings → Developer → Edit Config
 
-**For Local Development** (if running from source):
+**Recommended Configuration (Test Environment):**
 ```json
 {
   "mcpServers": {
@@ -96,12 +84,12 @@ Add the following to your Claude Desktop configuration file:
 {
   "mcpServers": {
     "namecom": {
-      "command": "npx",
+      "command": "node",
       "args": ["namecom-mcp"],
       "env": {
         "NAME_USERNAME": "your-name-com-username",
         "NAME_TOKEN": "your-name-com-api-token",
-        "NAME_API_URL": "https://api.name.com"
+        "NAME_API_URL": "https://mcp.name.com"
       }
     }
   }
@@ -115,8 +103,8 @@ If you prefer environment variables, create a `.env` file:
 ```env
 NAME_USERNAME=your-name-com-username
 NAME_TOKEN=your-name-com-api-token
-# Defaults to test environment - uncomment and modify for production:
-# NAME_API_URL=https://api.name.com
+# Defaults to test environment - uncomment and modify for production (advanced):
+# NAME_API_URL=https://mcp.name.com
 ```
 
 ## Testing & Verification
@@ -213,8 +201,8 @@ The server dynamically generates tools based on the Name.com OpenAPI specificati
 
 ## Environment Information
 
-- **Default Environment**: Test environment (`https://api.dev.name.com`)
-- **Production Environment**: Available by setting `NAME_API_URL=https://api.name.com`
+- **Default Environment**: Test environment (`https://mcp.dev.name.com`)
+- **Production Environment**: Available by setting `NAME_API_URL=https://mcp.name.com`
 - **Safety**: Test environment operations won't affect real domains or incur charges
 
 ## Security Considerations
@@ -266,7 +254,7 @@ The package is automatically built before publishing thanks to the `prepublishOn
 ### Common Issues
 
 1. **Authentication Errors**: Verify your `NAME_USERNAME` and `NAME_TOKEN` are correct
-2. **API URL Issues**: The tool defaults to test environment (`api.dev.name.com`)
+2. **API URL Issues**: The tool defaults to test environment (`mcp.dev.name.com`)
 3. **Tool Generation Fails**: The server will fall back to basic tools if OpenAPI spec loading fails
 4. **Package Not Found**: 
    - Make sure you've installed the package: `npm install -g namecom-mcp`
