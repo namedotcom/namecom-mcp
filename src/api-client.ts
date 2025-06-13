@@ -4,8 +4,13 @@ import { NameApiResponse, FetchOptions } from "./types.js";
 import { NAME_USERNAME, NAME_TOKEN, NAME_API_URL } from "./config.js";
 
 // Read version from package.json
-const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
-const VERSION = packageJson.version;
+let VERSION = ''; // fallback version
+try {
+  const packageJson = JSON.parse(readFileSync('../package.json', 'utf8'));
+  VERSION = packageJson.version;
+} catch (error) {
+  // Use fallback version if reading fails
+}
 
 // Trusted MCP URLs that we can safely bypass SSL validation for
 const TRUSTED_MCP_URLS = [

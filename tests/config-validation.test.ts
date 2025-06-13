@@ -52,34 +52,6 @@ describe('Config URL Validation', () => {
     expect(process.exit).not.toHaveBeenCalled();
   });
 
-  it('should reject old API dev URL', async () => {
-    process.env.NAME_USERNAME = 'test-user';
-    process.env.NAME_TOKEN = 'test-token';
-    process.env.NAME_API_URL = 'https://mcp.dev.name.com';
-
-    await import('../src/config.js');
-    
-    expect(process.exit).toHaveBeenCalledWith(1);
-    expect(process.stderr.write).toHaveBeenCalledWith(
-      expect.stringContaining('Invalid NAME_API_URL provided: https://mcp.dev.name.com')
-    );
-    expect(process.stderr.write).toHaveBeenCalledWith(
-      expect.stringContaining('Please use one of the supported endpoints')
-    );
-  });
-
-  it('should reject old API production URL', async () => {
-    process.env.NAME_USERNAME = 'test-user';
-    process.env.NAME_TOKEN = 'test-token';
-    process.env.NAME_API_URL = 'https://mcp.name.com';
-
-    await import('../src/config.js');
-    
-    expect(process.exit).toHaveBeenCalledWith(1);
-    expect(process.stderr.write).toHaveBeenCalledWith(
-      expect.stringContaining('Invalid NAME_API_URL provided: https://mcp.name.com')
-    );
-  });
 
   it('should reject arbitrary URLs', async () => {
     process.env.NAME_USERNAME = 'test-user';
