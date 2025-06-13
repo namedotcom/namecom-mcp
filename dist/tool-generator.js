@@ -1,7 +1,75 @@
 import { z } from "zod";
 import { loadOpenApiSpec, openApiSchemaToZod, resolveSchemaRef } from "./openapi-utils.js";
 import { callNameApi } from "./api-client.js";
-import { DEFAULT_VALUES } from "./config.js";
+import { DEFAULT_VALUES, NAME_API_URL } from "./config.js";
+/**
+ * Helper functions to create the help and support tools
+ */
+function addHelpTools(server) {
+    server.tool("GetHelpResources", {}, async () => {
+        return {
+            content: [{
+                    type: "text",
+                    text: `# Name.com Help Resources
+
+## Documentation & Guides
+- **Knowledge Base**: https://www.name.com/support
+- **API Documentation**: https://docs.name.com
+
+## Getting Support
+- **Contact Support**: https://www.name.com/contact
+
+## Community & Resources
+- **Blog**: https://www.name.com/blog`
+                }]
+        };
+    });
+    server.tool("GetFeedbackLinks", {}, async () => {
+        return {
+            content: [{
+                    type: "text",
+                    text: `# Provide Feedback
+
+## For MCP Server Issues:
+- **GitHub Issues**: https://github.com/namedotcom/namecom-mcp/issues
+
+## For Name.com API or Service Issues:
+- **Contact Support**: https://www.name.com/contact
+
+## For Feature Requests:
+- **GitHub Discussions**: https://github.com/namedotcom/namecom-mcp/discussions`
+                }]
+        };
+    });
+    server.tool("GetTroubleshootingInfo", {}, async () => {
+        // Determine environment based on the API URL
+        const environment = NAME_API_URL.includes('dev') ? 'Development (mcp.dev.name.com)' : 'Production (mcp.name.com)';
+        return {
+            content: [{
+                    type: "text",
+                    text: `# Troubleshooting Information
+
+## Current Environment:
+- **Environment**: ${environment}
+
+## Common Issues & Quick Tips:
+
+**Authentication Issues**: Verify your NAME_USERNAME and NAME_TOKEN are correct
+
+**Connection Issues**: Check your internet connection and try the HelloFunc tool first
+
+**Domain Issues**: Confirm the domain exists in your account and check ownership
+
+**DNS Issues**: Allow time for DNS propagation (up to 48 hours)
+
+## Get More Help:
+- **Support Center**: https://www.name.com/support
+- **Contact Support**: https://www.name.com/contact
+- **MCP Server Issues**: https://github.com/namedotcom/namecom-mcp/issues`
+                }]
+        };
+    });
+}
 /**
  * Recursively flatten object properties into individual parameters with dot notation
  */
@@ -232,64 +300,7 @@ export async function createToolsFromSpec(server) {
         }
     }
     // Add help and support tools that are always available to users
-    server.tool("GetHelpResources", {}, async () => {
-        return {
-            content: [{
-                    type: "text",
-                    text: `# Name.com Help Resources
-
-## Documentation & Guides
-- **Knowledge Base**: https://www.name.com/support
-- **API Documentation**: https://docs.name.com
-
-## Getting Support
-- **Contact Support**: https://www.name.com/contact
-
-## Community & Resources
-- **Blog**: https://www.name.com/blog`
-                }]
-        };
-    });
-    server.tool("GetFeedbackLinks", {}, async () => {
-        return {
-            content: [{
-                    type: "text",
-                    text: `# Provide Feedback
-
-## For MCP Server Issues:
-- **GitHub Issues**: https://github.com/namedotcom/namecom-mcp/issues
-
-## For Name.com API or Service Issues:
-- **Contact Support**: https://www.name.com/contact
-
-## For Feature Requests:
-- **GitHub Discussions**: https://github.com/namedotcom/namecom-mcp/discussions`
-                }]
-        };
-    });
-    server.tool("GetTroubleshootingInfo", {}, async () => {
-        return {
-            content: [{
-                    type: "text",
-                    text: `# Troubleshooting Information
-
-## Common Issues & Quick Tips:
-
-**Authentication Issues**: Verify your NAME_USERNAME and NAME_TOKEN are correct
-
-**Connection Issues**: Check your internet connection and try the HelloFunc tool first
-
-**Domain Issues**: Confirm the domain exists in your account and check ownership
-
-**DNS Issues**: Allow time for DNS propagation (up to 48 hours)
-
-## Get More Help:
-- **Support Center**: https://www.name.com/support
-- **Contact Support**: https://www.name.com/contact
-- **MCP Server Issues**: https://github.com/namedotcom/namecom-mcp/issues`
-                }]
-        };
-    });
+    addHelpTools(server);
     return true;
 }
 /**
@@ -318,4 +329,6 @@ export function createFallbackTools(server) {
             };
         }
     });
+    // Add help and support tools that are always available to users (even in fallback mode)
+    addHelpTools(server);
 }
