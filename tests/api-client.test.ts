@@ -192,5 +192,61 @@ describe('API Client', () => {
 
       expect(result).toBeUndefined();
     });
+
+    it('should include User-Agent header with version number', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({}),
+        headers: new Map([['content-type', 'application/json']])
+      });
+
+      await callNameApi('/core/v1/domains');
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/core/v1/domains'),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            'User-Agent': expect.stringMatching(/^namecom-mcp\/\d+\.\d+\.\d+.*$/)
+          })
+        })
+      );
+    });
+  });
+});
+
+describe('API Client Configuration', () => {
+  // Add test to ensure only MCP URLs are in trusted list
+  test('TRUSTED_MCP_URLS should only contain official MCP URLs', () => {
+    // Read the source file to extract TRUSTED_MCP_URLS
+    const fs = require('fs');
+    const path = require('path');
+    const apiClientPath = path.join(__dirname, '..', 'src', 'api-client.ts');
+    const sourceCode = fs.readFileSync(apiClientPath, 'utf8');
+    
+    // Extract the TRUSTED_MCP_URLS array using regex
+    const trustedUrlsMatch = sourceCode.match(/const TRUSTED_MCP_URLS = \[([\s\S]*?)\];/);
+    expect(trustedUrlsMatch).toBeTruthy();
+    
+    const urlsString = trustedUrlsMatch[1];
+    const urls = urlsString
+      .split(',')
+      .map((line: string) => line.trim())
+      .filter((line: string) => line.startsWith("'") || line.startsWith('"'))
+      .map((line: string) => line.replace(/['"]/g, '').trim());
+    
+    // Define allowed MCP URLs
+    const allowedMcpUrls = [
+      'https://mcp.dev.name.com',
+      'https://mcp.name.com'
+    ];
+    
+    // Check that only allowed URLs are present
+    urls.forEach((url: string) => {
+      expect(allowedMcpUrls).toContain(url);
+    });
+    
+    // Ensure we have exactly the expected URLs
+    expect(urls.sort()).toEqual(allowedMcpUrls.sort());
   });
 }); 
