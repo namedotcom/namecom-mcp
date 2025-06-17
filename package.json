@@ -8,7 +8,7 @@
     "namecom-mcp": "dist/index.js"
   },
   "scripts": {
-    "build": "tsc && cp src/*.yaml dist/",
+    "build": "node scripts/embed-spec.cjs && tsc",
     "start": "node dist/index.js",
     "dev": "node --loader ts-node/esm src/index.ts",
     "test": "jest",

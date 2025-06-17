@@ -1,7 +1,5 @@
-import path from "path";
-import { load } from "js-yaml";
-import fs from "fs/promises";
 import { z } from "zod";
+import { EMBEDDED_SPEC } from "./embedded-spec.js";
 // Global variable to store the loaded spec for reference resolution
 let globalSpec = null;
 /**
@@ -17,56 +15,16 @@ export function getGlobalSpec() {
     return globalSpec;
 }
 /**
- * Get the OpenAPI spec file path (simple and reliable)
- */
-function getSpecPath() {
-    // Check if we're in a test environment (Jest workers have specific paths)
-    if (process.argv[1] && process.argv[1].includes('jest-worker')) {
-        // In test environment: use src/namecom.api.yaml relative to project root
-        return path.resolve(process.cwd(), 'src', 'namecom.api.yaml');
-    }
-    // Try multiple fallback paths for different environments
-    const possiblePaths = [
-        // Same directory as the current script (ideal case)
-        path.resolve(path.dirname(process.argv[1] || ''), 'namecom.api.yaml'),
-        // CI environment: check src/ directory relative to project root
-        path.resolve(process.cwd(), 'src', 'namecom.api.yaml'),
-        // CI environment: check dist/ directory relative to project root  
-        path.resolve(process.cwd(), 'dist', 'namecom.api.yaml'),
-        // Global install: check if we can find it relative to the script location
-        path.resolve(path.dirname(path.dirname(process.argv[1] || '')), 'namecom.api.yaml'),
-        // Last resort: check current working directory
-        path.resolve(process.cwd(), 'namecom.api.yaml')
-    ];
-    // Return the first path that exists, or the primary path if none exist
-    for (const testPath of possiblePaths) {
-        try {
-            // Use synchronous check to avoid async complications
-            require('fs').accessSync(testPath, require('fs').constants.F_OK);
-            return testPath;
-        }
-        catch {
-            // Continue to next path
-        }
-    }
-    // If no file found, return the primary path (will cause error later with helpful message)
-    return possiblePaths[0];
-}
-/**
- * Load and parse OpenAPI spec from YAML file
+ * Load and parse OpenAPI spec (now using embedded spec)
  */
 export async function loadOpenApiSpec() {
     try {
-        const specPath = getSpecPath();
-        const yamlContent = await fs.readFile(specPath, 'utf8');
-        const loadedSpec = load(yamlContent);
+        const loadedSpec = EMBEDDED_SPEC;
         // Store the loaded spec to resolve references later
         globalSpec = loadedSpec;
         return loadedSpec;
     }
     catch (error) {
-        console.error('Could not find namecom.api.yaml spec file at:', getSpecPath());
-        console.error('Error:', error.message);
         globalSpec = null;
         return null;
     }
