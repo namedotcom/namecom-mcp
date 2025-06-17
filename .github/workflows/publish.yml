@@ -26,13 +26,21 @@ jobs:
       - name: Build package
         run: npm run build
 
-      - name: Update package version from release tag
+      - name: Verify package version
         run: |
           # Extract version from release tag (remove 'v' prefix if present)
           VERSION=${GITHUB_REF#refs/tags/}
           VERSION=${VERSION#v}
-          echo "Setting package version to: $VERSION"
-          npm version $VERSION --no-git-tag-version
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          echo "Tag version: $VERSION"
+          echo "Package version: $CURRENT_VERSION"
+          
+          if [ "$CURRENT_VERSION" != "$VERSION" ]; then
+            echo "❌ Error: package.json version ($CURRENT_VERSION) doesn't match tag ($VERSION)"
+            exit 1
+          else
+            echo "✅ Version is correct ($VERSION)"
+          fi
 
       - name: Publish to NPM
         run: npm publish
