@@ -22,38 +22,56 @@ export function getGlobalSpec(): (OpenApiSpec & { components?: { schemas?: Recor
 }
 
 /**
+ * Get the OpenAPI spec file path (simple and reliable)
+ */
+function getSpecPath(): string {
+  // Check if we're in a test environment (Jest workers have specific paths)
+  if (process.argv[1] && process.argv[1].includes('jest-worker')) {
+    // In test environment: use src/namecom.api.yaml relative to project root
+    return path.resolve(process.cwd(), 'src', 'namecom.api.yaml');
+  }
+  
+  // Try multiple fallback paths for different environments
+  const possiblePaths = [
+    // Same directory as the current script (ideal case)
+    path.resolve(path.dirname(process.argv[1] || ''), 'namecom.api.yaml'),
+    
+    // CI environment: check src/ directory relative to project root
+    path.resolve(process.cwd(), 'src', 'namecom.api.yaml'),
+    
+    // CI environment: check dist/ directory relative to project root  
+    path.resolve(process.cwd(), 'dist', 'namecom.api.yaml'),
+    
+    // Global install: check if we can find it relative to the script location
+    path.resolve(path.dirname(path.dirname(process.argv[1] || '')), 'namecom.api.yaml'),
+    
+    // Last resort: check current working directory
+    path.resolve(process.cwd(), 'namecom.api.yaml')
+  ];
+  
+  // Return the first path that exists, or the primary path if none exist
+  for (const testPath of possiblePaths) {
+    try {
+      // Use synchronous check to avoid async complications
+      require('fs').accessSync(testPath, require('fs').constants.F_OK);
+      return testPath;
+    } catch {
+      // Continue to next path
+    }
+  }
+  
+  // If no file found, return the primary path (will cause error later with helpful message)
+  return possiblePaths[0];
+}
+
+/**
  * Load and parse OpenAPI spec from YAML file
  */
 export async function loadOpenApiSpec(): Promise<OpenApiSpec | null> {
   try {
-    // Try multiple possible locations for the spec file
-    const possiblePaths = [
-      // For development/testing: from current working directory
-      path.resolve(process.cwd(), 'assets', 'namecom.api.yaml'),
-      // For installed package: relative to the script location (assets is sibling to dist)
-      path.resolve(path.dirname(process.argv[1] || ''), '..', 'assets', 'namecom.api.yaml'),
-      // Try relative to node_modules location if installed as dependency
-      path.resolve(process.cwd(), 'node_modules', 'namecom-mcp', 'assets', 'namecom.api.yaml'),
-    ]
+    const specPath = getSpecPath();
     
-    let yamlContent: string | null = null;
-    let lastError: Error | null = null;
-    
-    for (const specPath of possiblePaths) {
-      try {
-        yamlContent = await fs.readFile(specPath, 'utf8');
-        break; // Found it!
-      } catch (error) {
-        lastError = error as Error;
-        // Continue trying other paths
-      }
-    }
-    
-    if (!yamlContent) {
-      console.error('Could not find namecom.api.yaml spec file. Tried paths:', possiblePaths);
-      if (lastError) console.error('Last error:', lastError.message);
-      throw new Error('Could not locate OpenAPI spec file');
-    }
+    const yamlContent = await fs.readFile(specPath, 'utf8');
     
     const loadedSpec = load(yamlContent) as OpenApiSpec & { components?: { schemas?: Record<string, OpenApiSchema> } };
     
@@ -62,6 +80,8 @@ export async function loadOpenApiSpec(): Promise<OpenApiSpec | null> {
     
     return loadedSpec;
   } catch (error) {
+    console.error('Could not find namecom.api.yaml spec file at:', getSpecPath());
+    console.error('Error:', (error as Error).message);
     globalSpec = null;
     return null;
   }

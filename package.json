@@ -8,7 +8,7 @@
     "namecom-mcp": "dist/index.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp src/*.yaml dist/",
     "start": "node dist/index.js",
     "dev": "node --loader ts-node/esm src/index.ts",
     "test": "jest",
@@ -39,7 +39,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/namedotcom/namecom-mcp"
+    "url": "git+https://github.com/namedotcom/namecom-mcp.git"
   },
   "bugs": {
     "url": "https://github.com/namedotcom/namecom-mcp/issues"
@@ -47,7 +47,6 @@
   "homepage": "https://github.com/namedotcom/namecom-mcp#readme",
   "files": [
     "dist/**/*",
-    "assets/**/*",
     "README.md",
     "LICENSE",
     "env.example"
