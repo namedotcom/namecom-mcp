@@ -1,7 +1,7 @@
 # Name.com MCP Server (Experimental)
 
-[![npm version](https://badge.fury.io/js/namecom-mcp.svg)](https://badge.fury.io/js/namecom-mcp)
-[![Node.js CI](https://github.com/namedotcom/namecom-mcp/workflows/CI/badge.svg)](https://github.com/namedotcom/namecom-mcp/actions)
+[![npm version](https://img.shields.io/npm/v/namecom-mcp.svg)](https://www.npmjs.com/package/namecom-mcp)
+[![npm downloads](https://img.shields.io/npm/dm/namecom-mcp.svg)](https://www.npmjs.com/package/namecom-mcp)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![MCP Server](https://img.shields.io/badge/MCP-Server-orange.svg)](https://modelcontextprotocol.io/)
 
@@ -108,7 +108,7 @@ If you cannot locate this file through your filesystem, you can access it throug
     }
   }
 }
-
+```
 
 ### Alternative: Environment Variables
 
@@ -153,9 +153,9 @@ NAME_TOKEN=your-name-com-api-token
    - Claude will ask for permission each time it tries to use a tool
    - The conversation flow feels natural and intuitive
 
-### Method 2: MCP Inspector (For Testing & Development)
+### Method 2: MCP Inspector (Advanced For Testing & Debugging)
 
-The MCP Inspector is **excellent for testing and debugging** during development, but Claude Desktop is better for actual domain management tasks.
+The MCP Inspector is **excellent for testing and debugging**, but Claude Desktop is better for actual domain management tasks.
 
 1. **Install the MCP Inspector** (if not already installed):
    ```bash
@@ -185,32 +185,9 @@ The MCP Inspector is **excellent for testing and debugging** during development,
 
 Many other AI tools and platforms are announcing MCP support, which means this Name.com server will work with an expanding ecosystem of AI assistants. Stay tuned for more integration options!
 
-## Usage
-
-Once configured, the MCP server will automatically generate tools for all available Name.com API endpoints. Here are some example operations you can perform:
-
-### Domain Management
-- Search for available domains
-- Register new domains (test environment safe)
-- Renew existing domains
-- Transfer domains
-- Update domain contacts
-
-### DNS Management
-- List DNS records
-- Create, update, and delete DNS records
-- Manage nameservers
-
-### SSL Certificates
-- Purchase SSL certificates
-- Manage certificate lifecycle
-
-### Account Management
-- View account information
-- Check domain and service pricing
-
 ## Available Tools
 
+Once configured, the MCP server will automatically generate tools for all available Name.com API endpoints.
 The server dynamically generates tools based on the Name.com OpenAPI specification. Common tools include:
 
 - `listDomains` - List domains in your account
@@ -286,7 +263,7 @@ If you run into issues:
 3. Verify your credentials work with Name.com's API directly
 4. Open an issue on GitHub with detailed error messages
 
-## ❓ FAQ
+## FAQ
 
 **Q: Can I use this with production domains?**
 A: Yes, but it defaults to test environment. Set `NAME_API_URL=https://mcp.name.com` for production. **THIS WILL USE YOUR REAL NAME.COM ACCOUNT AND PAYMENT METHODS**
@@ -307,7 +284,7 @@ A: Yes, but each instance should use different credentials to avoid conflicts.
 A: No, it requires internet access to communicate with Name.com's API.
 
 
-## 🌐 MCP Ecosystem
+## MCP Ecosystem
 
 This server is part of the growing MCP ecosystem:
 
