@@ -31,7 +31,7 @@ describe('Real Name.com Schema Tests', () => {
 
     // Load the actual Name.com OpenAPI spec
     try {
-      const specPath = path.join(__dirname, '../src/namecom.api.yaml');
+      const specPath = path.join(__dirname, '../assets/namecom.api.yaml');
       const specContent = fs.readFileSync(specPath, 'utf8');
       realSpec = load(specContent) as OpenApiSpec;
     } catch (error) {
