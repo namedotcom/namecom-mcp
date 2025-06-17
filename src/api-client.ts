@@ -6,7 +6,7 @@ import { NAME_USERNAME, NAME_TOKEN, NAME_API_URL } from "./config.js";
 // Read version from package.json
 let VERSION = ''; // fallback version
 try {
-  const packageJson = JSON.parse(readFileSync('../package.json', 'utf8'));
+  const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));
   VERSION = packageJson.version;
 } catch (error) {
   // Use fallback version if reading fails

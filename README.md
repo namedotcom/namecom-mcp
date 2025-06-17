@@ -1,5 +1,10 @@
 # Name.com MCP Server (Experimental)
 
+[![npm version](https://badge.fury.io/js/namecom-mcp.svg)](https://badge.fury.io/js/namecom-mcp)
+[![Node.js CI](https://github.com/namedotcom/namecom-mcp/workflows/CI/badge.svg)](https://github.com/namedotcom/namecom-mcp/actions)
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![MCP Server](https://img.shields.io/badge/MCP-Server-orange.svg)](https://modelcontextprotocol.io/)
+
 A Model Context Protocol (MCP) server that provides access to the Name.com API for domain management operations. This server automatically generates tools from the Name.com OpenAPI specification, allowing AI assistants to interact with domain registration, DNS management, and other Name.com services.
 
 > **⚠️ Experimental Tool**: This MCP server is currently experimental and defaults to Name.com's test environment (`mcp.dev.name.com`). While you can configure it to use the production environment, we recommend using the test environment for initial experimentation.
@@ -21,6 +26,23 @@ A Model Context Protocol (MCP) server that provides access to the Name.com API f
 
 ## Installation
 
+### Prerequisites
+
+- **Node.js**: Version 17 or higher ([download here](https://nodejs.org/))
+- **Name.com Account**: [Sign up for free](https://www.name.com/)
+- **API Credentials**: Generated from your Name.com account dashboard
+- **Claude Desktop**: [Download from Anthropic](https://claude.ai/download) (recommended)
+
+### Getting Name.com API Credentials
+
+You'll need Name.com API credentials:
+
+1. Log in to your Name.com account
+2. Go to Account Settings > API Tokens
+3. Generate an API token
+4. Note your username and the generated token
+5. Make sure you are using the correct credentials for your configured environment (dev vs prod)
+
 ### Quick Start (Recommended)
 
 The easiest way to get started - no building required!
@@ -31,28 +53,20 @@ npm install -g namecom-mcp
 
 That's it! The package comes pre-compiled and ready to use. Follow configuration for next steps.
 
-### From Source (For Development)
+## 🚀 Quick Example
 
-Only needed if you want to modify the code:
+After installation and configuration, you can immediately start using natural language:
 
-```bash
-git clone https://github.com/namedotcom/namecom-mcp.git
-cd namecom-mcp
-npm install
-npm run build
-```
+**Ask Claude:**
+> "Can you search for available domains with 'myawesomeproject' in the name?"
+
+**Claude will:**
+1. Ask permission to use the domain search tool
+2. Search Name.com's test environment safely
+3. Show you available options with pricing
+4. Help you register if you want (in test mode)
 
 ## Configuration
-
-### Prerequisites
-
-You'll need Name.com API credentials:
-
-1. Log in to your Name.com account
-2. Go to Account Settings > API Access
-3. Generate an API token
-4. Note your username and the generated token
-5. Make sure you are using the correct credentials for your configured environment (dev vs prod)
 
 ### Claude Desktop Setup (Recommended)
 
@@ -63,13 +77,13 @@ Add the following to your Claude Desktop configuration file. Default Claude conf
 
 If you cannot locate this file through your filesystem, you can access it through Claude Desktop Settings → Developer → Edit Config
 
-**Recommended Configuration (Test Environment):**
+**For npm installation (Recommended):**
 ```json
 {
   "mcpServers": {
     "namecom": {
-      "command": "node",
-      "args": ["/path/to/your/namecom-mcp/dist/index.js"],
+      "command": "npx",
+      "args": ["namecom-mcp"],
       "env": {
         "NAME_USERNAME": "your-name-com-username",
         "NAME_TOKEN": "your-name-com-api-token"
@@ -84,7 +98,7 @@ If you cannot locate this file through your filesystem, you can access it throug
 {
   "mcpServers": {
     "namecom": {
-      "command": "node",
+      "command": "npx",
       "args": ["namecom-mcp"],
       "env": {
         "NAME_USERNAME": "your-name-com-username",
@@ -94,7 +108,7 @@ If you cannot locate this file through your filesystem, you can access it throug
     }
   }
 }
-```
+
 
 ### Alternative: Environment Variables
 
@@ -106,6 +120,14 @@ NAME_TOKEN=your-name-com-api-token
 # Defaults to test environment - uncomment and modify for production (advanced):
 # NAME_API_URL=https://mcp.name.com
 ```
+
+## System Requirements
+
+- **Node.js**: ≥17.0.0
+- **npm**: ≥8.0.0  
+- **Operating Systems**: macOS, Linux, Windows
+- **Claude Desktop**: Latest version recommended
+- **Network**: Internet access for Name.com API
 
 ## Testing & Verification
 
@@ -214,40 +236,11 @@ The server dynamically generates tools based on the Name.com OpenAPI specificati
 - **Input Validation**: All inputs are validated using Zod schemas
 - **Error Handling**: Errors are handled gracefully without exposing sensitive information
 
-## Development
 
-### For Contributors and Developers
+## Performance & Limits
 
-Building from source is only needed if you want to modify the code or contribute to the project.
-
-```bash
-git clone https://github.com/namedotcom/namecom-mcp.git
-cd namecom-mcp
-npm install
-npm run build
-```
-
-### Running in Development Mode
-
-```bash
-npm run dev
-```
-
-### Project Structure
-
-```
-src/
-├── index.ts           # Main entry point
-├── config.ts          # Configuration and environment variables
-├── api-client.ts      # Name.com API client
-├── tool-generator.ts  # Dynamic tool generation from OpenAPI spec
-├── openapi-utils.ts   # OpenAPI specification utilities
-└── types.ts           # TypeScript type definitions
-```
-
-### Publishing
-
-The package is automatically built before publishing thanks to the `prepublishOnly` script. The published package includes the compiled `dist` directory, so users don't need to build anything.
+- **API Rate Limits**: Respects Name.com's standard rate limits
+- **Tool Generation**: ~2-3 seconds on first startup
 
 ## Troubleshooting
 
@@ -267,12 +260,22 @@ The package is automatically built before publishing thanks to the `prepublishOn
    - For NPM installation, use: `npx @modelcontextprotocol/inspector npx namecom-mcp`
    - Check that your environment variables are set correctly
 
-### Debug Mode
+### npm Installation Issues
 
-Set the environment variable `DEBUG=1` for verbose logging:
-
+**"command not found: namecom-mcp"**
 ```bash
-DEBUG=1 npx namecom-mcp
+# Make sure global npm packages are in your PATH
+npm config get prefix
+# or reinstall globally
+npm install -g namecom-mcp
+```
+
+**Permission denied errors**
+```bash
+# Use npx instead of global install
+npx namecom-mcp
+# or fix npm permissions (macOS/Linux)
+sudo chown -R $(whoami) $(npm config get prefix)/{lib/node_modules,bin,share}
 ```
 
 ### Getting Help
@@ -283,13 +286,33 @@ If you run into issues:
 3. Verify your credentials work with Name.com's API directly
 4. Open an issue on GitHub with detailed error messages
 
-## Contributing
+## ❓ FAQ
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+**Q: Can I use this with production domains?**
+A: Yes, but it defaults to test environment. Set `NAME_API_URL=https://mcp.name.com` for production. **THIS WILL USE YOUR REAL NAME.COM ACCOUNT AND PAYMENT METHODS**
+
+**Q: Does this work with other AI tools besides Claude?**
+A: Not yet. More integrations coming soon.
+
+**Q: How much does it cost to use?**
+A: The MCP server is free. You only pay for actual Name.com services you use.
+
+**Q: Is it safe to test?**
+A: Yes! Default test environment won't affect real domains or billing.
+
+**Q: Can I run multiple instances?**
+A: Yes, but each instance should use different credentials to avoid conflicts.
+
+**Q: Does it work offline?**
+A: No, it requires internet access to communicate with Name.com's API.
+
+
+## 🌐 MCP Ecosystem
+
+This server is part of the growing MCP ecosystem:
+
+- **[MCP Inspector](https://github.com/modelcontextprotocol/inspector)**: Debug and test MCP servers
+- **[MCP SDK](https://github.com/modelcontextprotocol/typescript-sdk)**: Build your own MCP servers
 
 ## License
 
