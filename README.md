@@ -9,16 +9,16 @@ A Model Context Protocol (MCP) server that provides access to the Name.com API f
 
 > **⚠️ Experimental Tool**: This MCP server is currently experimental and defaults to Name.com's test environment (`mcp.dev.name.com`). While you can configure it to use the production environment, we recommend using the test environment for initial experimentation.
 
-## Best Way to Use This Tool
+## How to Use This Tool
 
-**Claude Desktop is the recommended way to use this MCP server.** It provides the most seamless experience for domain management tasks through natural conversation. The MCP Inspector is excellent for testing and debugging during development, and many other AI tools are announcing MCP support soon, which will expand the ways you can use this server!
+This MCP server works with **any AI tool that supports the Model Context Protocol (MCP)**. You can use it for domain management tasks through natural conversation with your preferred AI assistant. The MCP Inspector is excellent for testing and troubleshooting your setup.
 
 ## Features
 
 - 🔄 **Dynamic Tool Generation**: Automatically creates MCP tools from Name.com's OpenAPI specification
 - 🛡️ **Secure Authentication**: Uses Name.com API credentials with proper authentication
 - 📝 **Comprehensive API Coverage**: Supports all Name.com API endpoints including domains, DNS, and more
-- 🔧 **Flexible Configuration**: Simple integration with AI tools like Claude Desktop or local development
+- 🔧 **Flexible Configuration**: Simple integration with AI tools that support MCP
 - 📊 **Rich Parameter Support**: Handles complex nested objects, arrays, and all parameter types
 - 🚨 **Error Handling**: Robust error handling with informative error messages
 - 🧪 **Test Environment**: Defaults to safe test environment for experimentation
@@ -31,7 +31,7 @@ A Model Context Protocol (MCP) server that provides access to the Name.com API f
 - **Node.js**: Version 17 or higher ([download here](https://nodejs.org/))
 - **Name.com Account**: [Sign up for free](https://www.name.com/)
 - **API Credentials**: Generated from your Name.com account dashboard
-- **Claude Desktop**: [Download from Anthropic](https://claude.ai/download) (recommended)
+- **MCP-Compatible AI Tool**: Such as Claude Desktop, or any other tool with MCP support
 
 ### Getting Name.com API Credentials
 
@@ -68,16 +68,26 @@ After installation and configuration, you can immediately start using natural la
 
 ## Configuration
 
-### Claude Desktop Setup (Recommended)
+Configure the Name.com MCP server with your AI tool by providing the following:
 
-Add the following to your Claude Desktop configuration file. Default Claude config location:
+- **Command**: `npx namecom-mcp`
+- **Required Environment Variables**:
+  - `NAME_USERNAME`: Your Name.com username
+  - `NAME_TOKEN`: Your Name.com API token
+- **Optional Environment Variables**:
+  - `NAME_API_URL`: API endpoint (`https://mcp.dev.name.com` for test, `https://mcp.name.com` for production)
+
+### AI Tool-Specific Setup
+
+#### Claude Desktop
+
+Add the following to your Claude Desktop configuration file:
 
 **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 
-If you cannot locate this file through your filesystem, you can access it through Claude Desktop Settings → Developer → Edit Config
+Access through: Claude Desktop Settings → Developer → Edit Config
 
-**For npm installation (Recommended):**
 ```json
 {
   "mcpServers": {
@@ -93,31 +103,30 @@ If you cannot locate this file through your filesystem, you can access it throug
 }
 ```
 
-**For Production Environment** (advanced users):
-```json
-{
-  "mcpServers": {
-    "namecom": {
-      "command": "npx",
-      "args": ["namecom-mcp"],
-      "env": {
-        "NAME_USERNAME": "your-name-com-username",
-        "NAME_TOKEN": "your-name-com-api-token",
-        "NAME_API_URL": "https://mcp.name.com"
-      }
-    }
-  }
-}
-```
+#### Other MCP-Compatible Tools
 
-### Alternative: Environment Variables
+For other AI tools that support MCP, refer to their documentation for MCP server configuration. Generally, you'll need to:
 
-If you prefer environment variables, create a `.env` file:
+1. Specify the command: `npx namecom-mcp`
+2. Set environment variables: `NAME_USERNAME` and `NAME_TOKEN`
+3. Optionally set `NAME_API_URL` for production use
+
+**Popular MCP-Compatible Tools:**
+- [Claude Desktop](https://claude.ai/download) - Natural conversation interface
+- [ChatGPT Desktop](https://openai.com/chatgpt/desktop/) - OpenAI's desktop application with MCP support
+- [Cursor](https://cursor.sh/) - AI-powered code editor with MCP integration
+- [Continue](https://github.com/continuedev/continue) - VS Code extension with MCP support
+- [MCP Inspector](https://github.com/modelcontextprotocol/inspector) - Testing and troubleshooting
+- Many more tools are adding MCP support regularly
+
+### Environment Variables (Alternative Setup)
+
+If your tool doesn't support inline environment configuration, create a `.env` file:
 
 ```env
 NAME_USERNAME=your-name-com-username
 NAME_TOKEN=your-name-com-api-token
-# Defaults to test environment - uncomment and modify for production (advanced):
+# Defaults to test environment - uncomment for production (advanced):
 # NAME_API_URL=https://mcp.name.com
 ```
 
@@ -131,59 +140,55 @@ NAME_TOKEN=your-name-com-api-token
 
 ## Testing & Verification
 
-### Method 1: Claude Desktop (Recommended for Daily Use)
-
-**Claude Desktop provides the best experience** for using this MCP server. It's designed for natural conversation about domain management tasks.
+### Using with Your AI Tool
 
 1. **Install the package**:
    ```bash
    npm install -g namecom-mcp
    ```
 
-2. **Configure Claude Desktop** (see Configuration section above)
+2. **Configure your AI tool** (see Configuration section above)
 
-3. **Start Claude Desktop**:
-
-4. **Start using it naturally**:
-   - Ask Claude domain-related questions like:
+3. **Start your AI tool and begin using it naturally**:
+   - Ask domain-related questions like:
      - "Can you list my domains?"
      - "Search for available domains with the name 'example'"
      - "Show me the DNS records for my domain"
      - "Help me register a new domain"
-   - Claude will ask for permission each time it tries to use a tool
+   - Your AI tool will request permission to use Name.com tools
    - The conversation flow feels natural and intuitive
 
-### Method 2: MCP Inspector (Advanced For Testing & Debugging)
+### MCP Inspector (Testing & Troubleshooting)
 
-The MCP Inspector is **excellent for testing and debugging**, but Claude Desktop is better for actual domain management tasks.
+The MCP Inspector is **excellent for testing and troubleshooting** your MCP server setup before using it with your preferred AI tool.
 
 1. **Install the MCP Inspector** (if not already installed):
    ```bash
    npm install -g @modelcontextprotocol/inspector
    ```
 
-2. **Run the Inspector**:
+2. **Run the Inspector with your credentials**:
    ```bash
-   # For NPM installation:
-   npx @modelcontextprotocol/inspector npx namecom-mcp
-   
-   # For local development:
-   npx @modelcontextprotocol/inspector node "/path/to/your/namecom-mcp/dist/index.js"
+   NAME_USERNAME=your-name-com-username NAME_TOKEN=your-name-com-api-token npx @modelcontextprotocol/inspector namecom-mcp
+   ```
+
+   **For production environment** (advanced):
+   ```bash
+   NAME_USERNAME=your-username NAME_TOKEN=your-token NAME_API_URL=https://mcp.name.com npx @modelcontextprotocol/inspector namecom-mcp
    ```
 
 3. **Open the Inspector**:
-   - The command will output a local URL (usually `http://localhost:5173`)
+   - The command will output a local URL with an auth token (e.g., `http://localhost:6274/?MCP_PROXY_AUTH_TOKEN=...`)
    - Open this URL in your browser
 
 4. **Test the Connection**:
    - Click "Connect" in the left sidebar
-   - Make sure your setup shows the correct command and arguments
-   - Once connected, click "List Tools" in the center
+   - Once connected, click "List Tools" in the center to see all available Name.com API tools
    - Select any tool to test that the endpoints are working through the MCP server
 
-### Future: More AI Tools Coming Soon!
+### Growing MCP Ecosystem
 
-Many other AI tools and platforms are announcing MCP support, which means this Name.com server will work with an expanding ecosystem of AI assistants. Stay tuned for more integration options!
+The Model Context Protocol is rapidly gaining adoption across the AI tool ecosystem. This Name.com server works with any MCP-compatible tool, giving you flexibility in choosing your preferred AI assistant for domain management tasks.
 
 ## Available Tools
 
@@ -198,6 +203,17 @@ The server dynamically generates tools based on the Name.com OpenAPI specificati
 - `getAccountInfo` - Get account information
 - And many more...
 
+### Getting Help
+
+The server includes built-in help tools that your AI assistant can access to provide immediate support.
+
+**Need help?** Simply ask your AI assistant:
+- "How can I get help with Name.com?"
+- "I'm having issues, can you show me troubleshooting tips?"
+- "Where can I report a problem or request a feature?"
+
+Your AI assistant will automatically use the appropriate help tools to provide documentation links, troubleshooting guidance, and support resources.
+
 ## Environment Information
 
 - **Default Environment**: Test environment (`https://mcp.dev.name.com`)
@@ -206,7 +222,6 @@ The server dynamically generates tools based on the Name.com OpenAPI specificati
 
 ## Security Considerations
 
-- **Never commit credentials**: Always use environment variables or Claude Desktop configuration
 - **API Token Security**: Treat your Name.com API token like a password
 - **Test Environment**: Default test environment provides safe experimentation
 - **Least Privilege**: The server only accesses Name.com APIs with the permissions of your API token
@@ -234,8 +249,8 @@ The server dynamically generates tools based on the Name.com OpenAPI specificati
    - Restart Claude Desktop after configuration changes
    - Verify the command is `npx` and args are `["namecom-mcp"]`
 6. **MCP Inspector Connection Issues**:
-   - For NPM installation, use: `npx @modelcontextprotocol/inspector npx namecom-mcp`
-   - Check that your environment variables are set correctly
+   - Make sure to include your credentials: `NAME_USERNAME=your-username NAME_TOKEN=your-token npx @modelcontextprotocol/inspector namecom-mcp`
+   - Check that your credentials are correct and match your configured environment (test vs production)
 
 ### npm Installation Issues
 
