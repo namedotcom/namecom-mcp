@@ -203,7 +203,7 @@ describe('Tool Generator', () => {
       expect(mockServer.tool).toHaveBeenCalledWith(
         'CreateDomain',
         expect.objectContaining({
-          'domain.domainName': expect.any(Object)
+          'domain_domainName': expect.any(Object)
         }),
         expect.any(Function)
       );
@@ -307,10 +307,10 @@ describe('Tool Generator', () => {
       
       // Check that the parameters object has the expected flattened keys
       const parameterKeys = Object.keys(parameters);
-      expect(parameterKeys).toContain('domain.name');
-      expect(parameterKeys).toContain('domain.years');
-      expect(parameterKeys).toContain('contacts.registrant.firstName');
-      expect(parameterKeys).toContain('contacts.registrant.lastName');
+      expect(parameterKeys).toContain('domain_name');
+      expect(parameterKeys).toContain('domain_years');
+      expect(parameterKeys).toContain('contacts_registrant_firstName');
+      expect(parameterKeys).toContain('contacts_registrant_lastName');
     });
 
     it('should execute tool function correctly', async () => {

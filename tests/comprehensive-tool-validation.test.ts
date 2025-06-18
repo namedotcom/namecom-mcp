@@ -207,7 +207,7 @@ describe('Comprehensive Tool Validation', () => {
               testParams[paramName] = 'ns1.example.com,ns2.example.com';
             } else if (paramName.includes('metadata') || paramName.includes('tldRequirements')) {
               testParams[paramName] = '{"key":"value"}';
-            } else if (paramName.includes('.')) {
+            } else if (paramName.includes('_')) {
               testParams[paramName] = 'test-value';
             }
           }
@@ -339,8 +339,8 @@ describe('Comprehensive Tool Validation', () => {
           toolsWithParameters++;
         }
 
-        // Check for nested parameters (dot notation)
-        const hasNestedParams = Object.keys(tool.parameters).some(key => key.includes('.'));
+        // Check for nested parameters (underscore notation)
+        const hasNestedParams = Object.keys(tool.parameters).some(key => key.includes('_'));
         if (hasNestedParams) {
           toolsWithNestedParams++;
         }
