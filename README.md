@@ -70,30 +70,22 @@ After installation and configuration, you can immediately start using natural la
 
 Configure the Name.com MCP server with your AI tool by providing the following:
 
-- **Command**: `npx namecom-mcp`
+- **Command**: `namecom-mcp`
 - **Required Environment Variables**:
-  - `NAME_USERNAME`: Your Name.com username
+  - `NAME_USERNAME`: Your Name.com API token username
   - `NAME_TOKEN`: Your Name.com API token
 - **Optional Environment Variables**:
   - `NAME_API_URL`: API endpoint (`https://mcp.dev.name.com` for test, `https://mcp.name.com` for production)
 
-### AI Tool-Specific Setup
+### MCP Configuration
 
-#### Claude Desktop
-
-Add the following to your Claude Desktop configuration file:
-
-**macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-**Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-
-Access through: Claude Desktop Settings → Developer → Edit Config
+Add the following configuration to your MCP-compatible AI tool's config file:
 
 ```json
 {
   "mcpServers": {
     "namecom": {
-      "command": "npx",
-      "args": ["namecom-mcp"],
+      "command": "namecom-mcp",
       "env": {
         "NAME_USERNAME": "your-name-com-username",
         "NAME_TOKEN": "your-name-com-api-token"
@@ -103,17 +95,18 @@ Access through: Claude Desktop Settings → Developer → Edit Config
 }
 ```
 
-#### Other MCP-Compatible Tools
+**MCP Configuration Resources:**
 
-For other AI tools that support MCP, refer to their documentation for MCP server configuration. Generally, you'll need to:
+| Tool | Configuration Guide |
+|------|-------------------|
+| **Cursor** | Follow the [official Cursor MCP documentation](https://docs.cursor.com/context/model-context-protocol) |
+| **Claude Desktop** | Follow the [official Claude Desktop MCP setup guide](https://modelcontextprotocol.io/quickstart/user) |
+| **Other MCP tools** | Refer to your tool's official MCP documentation |
 
-1. Specify the command: `npx namecom-mcp`
-2. Set environment variables: `NAME_USERNAME` and `NAME_TOKEN`
-3. Optionally set `NAME_API_URL` for production use
+> 💡 **Tip**: Each tool may have slightly different configuration steps and UI. Always refer to the official documentation for the most up-to-date and accurate instructions.
 
 **Popular MCP-Compatible Tools:**
 - [Claude Desktop](https://claude.ai/download) - Natural conversation interface
-- [ChatGPT Desktop](https://openai.com/chatgpt/desktop/) - OpenAI's desktop application with MCP support
 - [Cursor](https://cursor.sh/) - AI-powered code editor with MCP integration
 - [Continue](https://github.com/continuedev/continue) - VS Code extension with MCP support
 - [MCP Inspector](https://github.com/modelcontextprotocol/inspector) - Testing and troubleshooting
@@ -135,7 +128,7 @@ NAME_TOKEN=your-name-com-api-token
 - **Node.js**: ≥17.0.0
 - **npm**: ≥8.0.0  
 - **Operating Systems**: macOS, Linux, Windows
-- **Claude Desktop**: Latest version recommended
+- **AI Tool (Cursor, Claude Desktop, etc)**: Latest version recommended
 - **Network**: Internet access for Name.com API
 
 ## Testing & Verification
@@ -220,6 +213,8 @@ Your AI assistant will automatically use the appropriate help tools to provide d
 - **Production Environment**: Available by setting `NAME_API_URL=https://mcp.name.com`
 - **Safety**: Test environment operations won't affect real domains or incur charges
 
+> ⚠️ **PRODUCTION ENVIRONMENT WARNING**: When using the production environment (`NAME_API_URL=https://mcp.name.com`), all operations will affect your real Name.com account, real domains, and use real payment methods. Domain registrations will incur real charges. Always test in the default test environment first.
+
 ## Security Considerations
 
 - **API Token Security**: Treat your Name.com API token like a password
@@ -244,31 +239,19 @@ Your AI assistant will automatically use the appropriate help tools to provide d
 4. **Package Not Found**: 
    - Make sure you've installed the package: `npm install -g namecom-mcp`
    - Try reinstalling if you encounter issues: `npm uninstall -g namecom-mcp && npm install -g namecom-mcp`
-5. **Claude Desktop Configuration Issues**:
-   - Check your `claude_desktop_config.json` file path and syntax
-   - Restart Claude Desktop after configuration changes
-   - Verify the command is `npx` and args are `["namecom-mcp"]`
+5. **MCP Configuration Issues**:
+   - Check your MCP config file path and JSON syntax (see Configuration section for file locations)
+   - Restart your AI tool after configuration changes
+   - Verify the command is `namecom-mcp` (no npx needed)
 6. **MCP Inspector Connection Issues**:
    - Make sure to include your credentials: `NAME_USERNAME=your-username NAME_TOKEN=your-token npx @modelcontextprotocol/inspector namecom-mcp`
    - Check that your credentials are correct and match your configured environment (test vs production)
 
 ### npm Installation Issues
 
-**"command not found: namecom-mcp"**
-```bash
-# Make sure global npm packages are in your PATH
-npm config get prefix
-# or reinstall globally
-npm install -g namecom-mcp
-```
-
-**Permission denied errors**
-```bash
-# Use npx instead of global install
-npx namecom-mcp
-# or fix npm permissions (macOS/Linux)
-sudo chown -R $(whoami) $(npm config get prefix)/{lib/node_modules,bin,share}
-```
+For npm installation or permission issues, see the official documentation:
+- **[npm global package installation](https://docs.npmjs.com/resolving-eacces-permissions-errors-when-installing-packages-globally)**
+- **[Node Version Manager (nvm)](https://github.com/nvm-sh/nvm)** - recommended for avoiding permission issues
 
 ### Getting Help
 
@@ -283,8 +266,8 @@ If you run into issues:
 **Q: Can I use this with production domains?**
 A: Yes, but it defaults to test environment. Set `NAME_API_URL=https://mcp.name.com` for production. **THIS WILL USE YOUR REAL NAME.COM ACCOUNT AND PAYMENT METHODS**
 
-**Q: Does this work with other AI tools besides Claude?**
-A: Not yet. More integrations coming soon.
+**Q: What AI tools does this work with?**
+A: This MCP server works with any tool that supports the Model Context Protocol, including Claude Desktop, Cursor, and many others.
 
 **Q: How much does it cost to use?**
 A: The MCP server is free. You only pay for actual Name.com services you use.

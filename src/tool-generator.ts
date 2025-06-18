@@ -90,21 +90,34 @@ function addHelpTools(server: McpServer): void {
 }
 
 /**
- * Recursively flatten object properties into individual parameters with dot notation
+ * Convert dot notation parameter names to valid MCP parameter names
+ * e.g., "account.contacts.admin.firstName" becomes "account_contacts_admin_firstName"
+ */
+function sanitizeParameterName(name: string): string {
+  return name.replace(/\./g, '_');
+}
+
+/**
+ * Recursively flatten object properties into individual parameters with sanitized names
  */
 function flattenObjectProperties(
   schema: any, 
   params: Record<string, z.ZodTypeAny>, 
   prefix: string, 
   requiredFields: string[],
-  parameterTypes: Record<string, 'array' | 'object' | 'simple'> = {}
+  parameterTypes: Record<string, 'array' | 'object' | 'simple'> = {},
+  originalPathMap: Record<string, string> = {}
 ): void {
   if (!schema.properties) return;
   
   for (const [propName, propSchema] of Object.entries(schema.properties)) {
     const fullPropName = prefix ? `${prefix}.${propName}` : propName;
+    const sanitizedPropName = sanitizeParameterName(fullPropName);
     const isPropRequired = requiredFields.includes(propName);
     const resolvedPropSchema = resolveSchemaRef(propSchema as any);
+    
+    // Store mapping from sanitized name back to original dot notation
+    originalPathMap[sanitizedPropName] = fullPropName;
     
     if (resolvedPropSchema.type === 'object' && resolvedPropSchema.properties) {
       // Recursively flatten nested objects
@@ -113,38 +126,39 @@ function flattenObjectProperties(
         params, 
         fullPropName, 
         resolvedPropSchema.required || [],
-        parameterTypes
+        parameterTypes,
+        originalPathMap
       );
     } else if (resolvedPropSchema.type === 'object' && resolvedPropSchema.additionalProperties) {
       // Handle objects with additionalProperties (like tldRequirements)
       // Treat as a simple string input that will be parsed as JSON
       const description = resolvedPropSchema.description || `Key-value object: ${fullPropName}`;
-      params[fullPropName] = z.string().optional()
+      params[sanitizedPropName] = z.string().optional()
         .describe(description + ' (JSON string: {"key1":"value1","key2":"value2"})');
-      parameterTypes[fullPropName] = 'object';
+      parameterTypes[sanitizedPropName] = 'object';
     } else if (resolvedPropSchema.type === 'array' && resolvedPropSchema.items) {
       const itemSchema = resolveSchemaRef(resolvedPropSchema.items);
       
       if (itemSchema.type === 'object' && itemSchema.properties) {
         // For arrays of objects, create a single parameter that accepts the array
         const description = resolvedPropSchema.description || `Array of objects: ${fullPropName}`;
-        params[fullPropName] = openApiSchemaToZod(resolvedPropSchema, isPropRequired)
+        params[sanitizedPropName] = openApiSchemaToZod(resolvedPropSchema, isPropRequired)
           .describe(description);
-        parameterTypes[fullPropName] = 'array';
+        parameterTypes[sanitizedPropName] = 'array';
       } else {
         // For arrays of simple types (like string arrays for nameservers)
         // Treat as a simple string input that will be parsed as comma-separated values
         const description = resolvedPropSchema.description || `Array of ${itemSchema.type || 'values'}: ${fullPropName}`;
-        params[fullPropName] = z.string().optional()
+        params[sanitizedPropName] = z.string().optional()
           .describe(description + ' (comma-separated: ns1.example.com,ns2.example.com)');
-        parameterTypes[fullPropName] = 'array';
+        parameterTypes[sanitizedPropName] = 'array';
       }
     } else {
       // For simple properties (string, number, boolean)
       const description = resolvedPropSchema.description || `Parameter: ${fullPropName}`;
-      params[fullPropName] = openApiSchemaToZod(resolvedPropSchema, isPropRequired)
+      params[sanitizedPropName] = openApiSchemaToZod(resolvedPropSchema, isPropRequired)
         .describe(description);
-      parameterTypes[fullPropName] = 'simple';
+      parameterTypes[sanitizedPropName] = 'simple';
     }
   }
 }
@@ -191,6 +205,7 @@ export async function createToolsFromSpec(server: McpServer): Promise<boolean> {
       const pathParams: string[] = [];
       const queryParams: string[] = [];
       const parameterTypes: Record<string, 'array' | 'object' | 'simple'> = {};
+      const originalPathMap: Record<string, string> = {};
       
       // Process operation parameters
       if (typedOperation.parameters) {
@@ -223,7 +238,7 @@ export async function createToolsFromSpec(server: McpServer): Promise<boolean> {
         
         // Handle request body properties - flatten ALL nested objects to individual parameters
         if (resolvedBodySchema.properties) {
-          flattenObjectProperties(resolvedBodySchema, params, '', resolvedBodySchema.required || [], parameterTypes);
+          flattenObjectProperties(resolvedBodySchema, params, '', resolvedBodySchema.required || [], parameterTypes, originalPathMap);
         } else if (resolvedBodySchema.type === 'object' && !resolvedBodySchema.properties) {
           // Handle case where schema is an object without explicit properties
           params['body'] = z.object({}).optional().describe('Request body object');
@@ -281,7 +296,9 @@ export async function createToolsFromSpec(server: McpServer): Promise<boolean> {
                     // For 'simple' type, keep as string (no processing needed)
                   }
                   
-                  setNestedProperty(bodyParams, key, processedValue);
+                  // Use original path mapping to restore dot notation for API call
+                  const originalPath = originalPathMap[key] || key;
+                  setNestedProperty(bodyParams, originalPath, processedValue);
                 }
               }
             }

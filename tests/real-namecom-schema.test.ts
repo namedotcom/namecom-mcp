@@ -159,31 +159,31 @@ describe('Real Name.com Schema Tests', () => {
         const [, parameters] = createDomainCall;
         const parameterKeys = Object.keys(parameters);
         
-        // Check that nested properties are flattened with dot notation
+        // Check that nested properties are flattened with underscore notation
         // Domain properties should be flattened
-        expect(parameterKeys).toContain('domain.domainName');
-        expect(parameterKeys).toContain('domain.autorenewEnabled');
-        expect(parameterKeys).toContain('domain.locked');
-        expect(parameterKeys).toContain('domain.privacyEnabled');
+        expect(parameterKeys).toContain('domain_domainName');
+        expect(parameterKeys).toContain('domain_autorenewEnabled');
+        expect(parameterKeys).toContain('domain_locked');
+        expect(parameterKeys).toContain('domain_privacyEnabled');
         
         // Deeply nested contact properties should be flattened
-        expect(parameterKeys).toContain('domain.contacts.registrant.firstName');
-        expect(parameterKeys).toContain('domain.contacts.registrant.lastName');
-        expect(parameterKeys).toContain('domain.contacts.registrant.address1');
-        expect(parameterKeys).toContain('domain.contacts.registrant.city');
-        expect(parameterKeys).toContain('domain.contacts.registrant.state');
-        expect(parameterKeys).toContain('domain.contacts.registrant.zip');
-        expect(parameterKeys).toContain('domain.contacts.registrant.country');
-        expect(parameterKeys).toContain('domain.contacts.registrant.email');
-        expect(parameterKeys).toContain('domain.contacts.registrant.phone');
+        expect(parameterKeys).toContain('domain_contacts_registrant_firstName');
+        expect(parameterKeys).toContain('domain_contacts_registrant_lastName');
+        expect(parameterKeys).toContain('domain_contacts_registrant_address1');
+        expect(parameterKeys).toContain('domain_contacts_registrant_city');
+        expect(parameterKeys).toContain('domain_contacts_registrant_state');
+        expect(parameterKeys).toContain('domain_contacts_registrant_zip');
+        expect(parameterKeys).toContain('domain_contacts_registrant_country');
+        expect(parameterKeys).toContain('domain_contacts_registrant_email');
+        expect(parameterKeys).toContain('domain_contacts_registrant_phone');
         
         // Admin contact should also be flattened
-        expect(parameterKeys).toContain('domain.contacts.admin.firstName');
-        expect(parameterKeys).toContain('domain.contacts.admin.lastName');
-        expect(parameterKeys).toContain('domain.contacts.admin.email');
+        expect(parameterKeys).toContain('domain_contacts_admin_firstName');
+        expect(parameterKeys).toContain('domain_contacts_admin_lastName');
+        expect(parameterKeys).toContain('domain_contacts_admin_email');
         
         // Array and root-level properties
-        expect(parameterKeys).toContain('domain.nameservers');
+        expect(parameterKeys).toContain('domain_nameservers');
         expect(parameterKeys).toContain('purchasePrice');
         expect(parameterKeys).toContain('years');
         expect(parameterKeys).toContain('tldRequirements');
@@ -250,7 +250,7 @@ describe('Real Name.com Schema Tests', () => {
         for (const [paramName, zodSchema] of Object.entries(parameters)) {
           const schemaType = (zodSchema as any)._def?.typeName;
           
-          if (paramName.includes('domain.domainName')) {
+          if (paramName.includes('domain_domainName')) {
             // Domain name should typically be required
             foundRequiredFields = true;
           }
@@ -301,11 +301,11 @@ describe('Real Name.com Schema Tests', () => {
 
         // Should have deeply nested contact properties flattened
         const expectedParams = [
-          'domain.domainName',
-          'domain.contacts.registrant.firstName',
-          'domain.contacts.registrant.lastName',
-          'domain.contacts.registrant.email',
-          'domain.contacts.registrant.phone',
+          'domain_domainName',
+          'domain_contacts_registrant_firstName',
+          'domain_contacts_registrant_lastName',
+          'domain_contacts_registrant_email',
+          'domain_contacts_registrant_phone',
           'purchasePrice',
           'years'
         ];
@@ -317,8 +317,8 @@ describe('Real Name.com Schema Tests', () => {
         // Should NOT have intermediate objects
         const shouldNotExist = [
           'domain',
-          'domain.contacts',
-          'domain.contacts.registrant'
+          'domain_contacts',
+          'domain_contacts_registrant'
         ];
 
         for (const param of shouldNotExist) {
