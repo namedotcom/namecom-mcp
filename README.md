@@ -128,7 +128,7 @@ NAME_TOKEN=your-name-com-api-token
 - **Node.js**: ≥17.0.0
 - **npm**: ≥8.0.0  
 - **Operating Systems**: macOS, Linux, Windows
-- **AI Tool (Cursor, Claude Desktop, etc)**: Latest version recommended
+- **AI Tool Installed (Cursor, Claude Desktop, etc)**: Latest version recommended
 - **Network**: Internet access for Name.com API
 
 ## Testing & Verification
