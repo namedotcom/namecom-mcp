@@ -159,18 +159,27 @@ interface ConsolidatedOperation {
  */
 export async function createToolsFromSpec(server: McpServer): Promise<boolean> {
   const spec = await loadOpenApiSpec();
-  if (!spec) {
+  if (!spec || !spec.paths) {
     return false;
   }
-  
-  // Group operations by tag
+
   const operationsByTag: Record<string, ConsolidatedOperation[]> = {};
-  
-  // Process each path in the spec
+
+  // Extract all unique HTTP methods from the spec dynamically
+  const supportedMethods = new Set<string>();
+  for (const pathItem of Object.values(spec.paths)) {
+    for (const method of Object.keys(pathItem)) {
+      // Only include valid HTTP methods (exclude non-method properties like 'parameters', 'summary', etc.)
+      if (typeof pathItem[method] === 'object' && pathItem[method]?.operationId) {
+        supportedMethods.add(method.toLowerCase());
+      }
+    }
+  }
+
   for (const [pathStr, pathItem] of Object.entries(spec.paths)) {
-    // Process each HTTP method for the path
+    // Process each HTTP method for the path using dynamically detected methods
     for (const [method, operation] of Object.entries(pathItem)) {
-      if (!['get', 'post', 'put', 'patch', 'delete'].includes(method) || !operation) continue;
+      if (!supportedMethods.has(method.toLowerCase()) || !operation) continue;
       
       const typedOperation = operation as OpenApiOperation;
       const operationId = typedOperation.operationId || `${method}${pathStr.replace(/\//g, '_').replace(/[{}]/g, '')}`;
@@ -196,53 +205,85 @@ export async function createToolsFromSpec(server: McpServer): Promise<boolean> {
       });
     }
   }
-  
+
   // Create consolidated tools for each tag
   for (const [tag, operations] of Object.entries(operationsByTag)) {
     await createConsolidatedTool(server, tag, operations);
   }
-  
+
   // Add help and support tools that are always available to users
   addHelpTools(server);
-  
+
   return true;
 }
 
 /**
- * Analyze HTTP method and path to determine operation type
+ * Analyze operation to determine operation type using OpenAPI spec data
  */
-function analyzeOperation(method: string, path: string, operationId: string): string {
+function analyzeOperation(method: string, path: string, operationId: string, operation: OpenApiOperation): string {
   const upperMethod = method.toUpperCase();
-  const pathSegments = path.split('/').filter(Boolean);
-  const hasIdParam = path.includes('{');
   
-  // Check operationId first for specific operations
-  const opId = operationId.toLowerCase();
-  if (opId === 'setcontacts') return 'setContacts';
-  if (opId === 'setnameservers') return 'setNameservers';
-  if (opId === 'purchaseprivacy') return 'purchasePrivacy';
-  if (opId === 'renewdomain') return 'renew';
-  if (opId === 'checkavailability') return 'check';
-  if (opId === 'search') return 'search';
-  if (opId === 'canceltransfer') return 'cancel';
-  if (opId === 'subscribetonotification') return 'subscribe';
-  if (opId === 'modifysubscription') return 'modify';
+  // Check if this operation has path parameters (more reliable than string matching)
+  const hasPathParams = operation.parameters?.some(param => param.in === 'path') || false;
   
-  // Check for specific path patterns (colon-based operations)
-  if (path.includes(':setContacts') || pathSegments.includes('contacts')) return 'setContacts';
-  if (path.includes(':setNameservers') || pathSegments.includes('nameservers')) return 'setNameservers';
-  if (path.includes(':privacy') || pathSegments.includes('privacy')) return 'purchasePrivacy';
+  const opIdLower = operationId.toLowerCase();
   
-  // Standard REST patterns
+  // Handle specific webhook operations (simple one-off fix)
+  if (opIdLower === 'subscribetonotification') return 'create';
+  if (opIdLower === 'getsubscribednotifications') return 'list';
+  if (opIdLower === 'modifysubscription') return 'modify';
+  if (opIdLower === 'deletesubscription') return 'delete';
+  
+  // Dynamic pattern-based inference from operationId (most reliable)
+  if (opIdLower.startsWith('list')) return 'list';
+  if (opIdLower.startsWith('get') && hasPathParams) return 'get';
+  if (opIdLower.startsWith('get') && !hasPathParams) return 'list';
+  if (opIdLower.startsWith('create')) return 'create';
+  if (opIdLower.startsWith('update')) return 'update';
+  if (opIdLower.startsWith('delete')) return 'delete';
+  
+  // Check for special colon-based operations in path (dynamic extraction)
+  if (path.includes(':')) {
+    const colonPart = path.split(':')[1];
+    if (colonPart) {
+      const colonOp = colonPart.toLowerCase();
+      // Map colon operations to standard operations
+      if (colonOp === 'checkavailability') return 'check';
+      if (colonOp === 'search') return 'search';
+      if (colonOp.includes('contact')) return 'setContacts';
+      if (colonOp.includes('nameserver')) return 'setNameservers';
+      // For other colon operations, use the colon part as the operation
+      return colonOp;
+    }
+  }
+  
+  // Dynamic keyword-based analysis (checks operation summary and description too)
+  const textToAnalyze = [
+    opIdLower,
+    operation.summary?.toLowerCase() || '',
+    operation.description?.toLowerCase() || ''
+  ].join(' ');
+  
+
+  
+  // Check for domain-specific operations
+  if (textToAnalyze.includes('availability') || textToAnalyze.includes('check')) return 'check';
+  if (textToAnalyze.includes('search') || textToAnalyze.includes('suggest')) return 'search';
+  if (textToAnalyze.includes('renew') || textToAnalyze.includes('renewal')) return 'renew';
+  if (textToAnalyze.includes('transfer') && upperMethod === 'POST') return 'create';
+  if (textToAnalyze.includes('cancel')) return 'cancel';
+  if (textToAnalyze.includes('subscribe') || textToAnalyze.includes('notification')) return 'subscribe';
+  if (textToAnalyze.includes('privacy') && upperMethod === 'POST') return 'purchasePrivacy';
+  if (textToAnalyze.includes('lock') || textToAnalyze.includes('unlock') || textToAnalyze.includes('enable') || textToAnalyze.includes('disable')) return 'update';
+  
+  // Handle other modify operations
+  if (textToAnalyze.includes('modify') || textToAnalyze.includes('update subscription')) return 'modify';
+  
+  // Fallback to HTTP method + path parameter analysis
   switch (upperMethod) {
     case 'GET':
-      return hasIdParam ? 'get' : 'list';
+      return hasPathParams ? 'get' : 'list';
     case 'POST':
-      // Special cases for domain operations based on operationId
-      if (operationId.includes('Check')) return 'check';
-      if (operationId.includes('Search')) return 'search';
-      if (operationId.includes('Renew')) return 'renew';
-      if (operationId.includes('Transfer')) return 'create';
       return 'create';
     case 'PUT':
     case 'PATCH':
@@ -250,30 +291,9 @@ function analyzeOperation(method: string, path: string, operationId: string): st
     case 'DELETE':
       return 'delete';
     default:
-      // Fallback to operationId analysis
-      return inferOperationFromId(operationId);
+      // Final fallback: use operationId as-is but normalized
+      return operationId.toLowerCase();
   }
-}
-
-/**
- * Fallback operation inference from operationId
- */
-function inferOperationFromId(operationId: string): string {
-  const id = operationId.toLowerCase();
-  
-  if (id.includes('list')) return 'list';
-  if (id.includes('get')) return 'get';
-  if (id.includes('create')) return 'create';
-  if (id.includes('update')) return 'update';
-  if (id.includes('delete')) return 'delete';
-  if (id.includes('check')) return 'check';
-  if (id.includes('search')) return 'search';
-  if (id.includes('renew')) return 'renew';
-  if (id.includes('cancel')) return 'cancel';
-  if (id.includes('subscribe')) return 'subscribe';
-  if (id.includes('modify')) return 'modify';
-  
-  return operationId.toLowerCase();
 }
 
 /**
@@ -283,7 +303,7 @@ function createOperationDescriptions(tag: string, operations: ConsolidatedOperat
   const operationDetails: string[] = [];
   
   for (const opType of uniqueOperations) {
-    const matchingOps = operations.filter(op => analyzeOperation(op.method, op.path, op.operationId) === opType);
+    const matchingOps = operations.filter(op => analyzeOperation(op.method, op.path, op.operationId, op.operation) === opType);
     
     if (matchingOps.length === 1) {
       const op = matchingOps[0];
@@ -375,7 +395,7 @@ async function createConsolidatedTool(server: McpServer, tag: string, operations
   }
   
   // For multi-operation tags, create consolidated tool
-  const operationEnum = operations.map(op => analyzeOperation(op.method, op.path, op.operationId)).filter(Boolean) as string[];
+  const operationEnum = operations.map(op => analyzeOperation(op.method, op.path, op.operationId, op.operation)).filter(Boolean) as string[];
   const uniqueOperations = [...new Set(operationEnum)];
   
   if (uniqueOperations.length === 0) {
@@ -421,7 +441,7 @@ async function createConsolidatedTool(server: McpServer, tag: string, operations
       
       // Find the matching operation
       const matchingOp = operations.find(op => 
-        analyzeOperation(op.method, op.path, op.operationId) === requestedOperation
+        analyzeOperation(op.method, op.path, op.operationId, op.operation) === requestedOperation
       );
       
       if (!matchingOp) {
@@ -576,6 +596,16 @@ async function executeOperation(
     }
     
     const result = await callNameApi(apiPath, op.method.toUpperCase(), requestBody);
+    
+    // Special formatting for CheckAccountBalance to display currency properly
+    if (op.operationId === 'CheckAccountBalance' && result && typeof result.balance === 'number') {
+      return {
+        content: [{
+          type: "text",
+          text: `Account Balance: $${result.balance.toFixed(2)}`
+        }]
+      };
+    }
     
     return {
       content: [{
