@@ -81,6 +81,7 @@ describe('Tool Generator', () => {
               operationId: 'ListDomains',
               summary: 'List Domains',
               description: 'Lists all domains in your account',
+              tags: ['Domains'],
               parameters: [
                 {
                   name: 'perPage',
@@ -118,6 +119,7 @@ describe('Tool Generator', () => {
               operationId: 'CreateDomain',
               summary: 'Create Domain',
               description: 'Creates a new domain',
+              tags: ['Domains'],
               requestBody: {
                 required: true,
                 content: {
@@ -158,6 +160,7 @@ describe('Tool Generator', () => {
               operationId: 'Hello',
               summary: 'Hello endpoint',
               description: 'Simple hello endpoint',
+              tags: ['Hello'],
               responses: {
                 '200': {
                   description: 'Success',
@@ -187,23 +190,15 @@ describe('Tool Generator', () => {
       const result = await createToolsFromSpec(mockServer as any);
 
       expect(result).toBe(true);
-      expect(mockServer.tool).toHaveBeenCalledTimes(6); // GET domains, POST domains, GET hello + 3 help tools
+      expect(mockServer.tool).toHaveBeenCalledTimes(5); // ManageDomains, Hello + 3 help tools
       
-      // Verify GET endpoint tool creation
+      // Verify consolidated ManageDomains tool creation
       expect(mockServer.tool).toHaveBeenCalledWith(
-        'ListDomains',
+        'ManageDomains',
         expect.objectContaining({
+          operation: expect.any(Object),
           page: expect.any(Object),
           perPage: expect.any(Object)
-        }),
-        expect.any(Function)
-      );
-
-      // Verify POST endpoint tool creation
-      expect(mockServer.tool).toHaveBeenCalledWith(
-        'CreateDomain',
-        expect.objectContaining({
-          'domain_domainName': expect.any(Object)
         }),
         expect.any(Function)
       );
@@ -224,6 +219,7 @@ describe('Tool Generator', () => {
               operationId: 'GetDomain',
               summary: 'Get Domain',
               description: 'Get details for a specific domain',
+              tags: ['Domains'],
               parameters: [
                 {
                   name: 'domainName',
@@ -243,6 +239,7 @@ describe('Tool Generator', () => {
       const result = await createToolsFromSpec(mockServer as any);
 
       expect(result).toBe(true);
+      // Since it's a single-operation tag, it should create individual tool
       expect(mockServer.tool).toHaveBeenCalledWith(
         'GetDomain',
         expect.objectContaining({
@@ -252,12 +249,71 @@ describe('Tool Generator', () => {
       );
     });
 
+    it('should create consolidated tools for multiple operations with same tag', async () => {
+      const mockSpec = {
+        paths: {
+          '/core/v1/domains': {
+            get: {
+              operationId: 'ListDomains',
+              tags: ['Domains'],
+              parameters: [
+                {
+                  name: 'perPage',
+                  in: 'query',
+                  schema: { type: 'integer' }
+                }
+              ]
+            },
+            post: {
+              operationId: 'CreateDomain',
+              tags: ['Domains'],
+              requestBody: {
+                required: true,
+                content: {
+                  'application/json': {
+                    schema: {
+                      type: 'object',
+                      properties: {
+                        domainName: { type: 'string' },
+                        years: { type: 'integer' }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      };
+
+      mockLoadOpenApiSpec.mockResolvedValue(mockSpec);
+      mockResolveSchemaRef.mockImplementation((schema) => schema);
+
+      const result = await createToolsFromSpec(mockServer as any);
+
+      expect(result).toBe(true);
+      
+      // Should create one consolidated tool for Domains
+      const domainsToolCall = mockServer.tool.mock.calls.find(call => call[0] === 'ManageDomains');
+      expect(domainsToolCall).toBeDefined();
+      
+      const parameters = domainsToolCall[1];
+      const parameterKeys = Object.keys(parameters);
+      
+      // Should have operation parameter and all operation-specific parameters
+      expect(parameterKeys).toContain('operation');
+      expect(parameterKeys).toContain('perPage');
+      expect(parameterKeys).toContain('domainName');
+      expect(parameterKeys).toContain('years');
+    });
+
     it('should handle complex nested request body schemas', async () => {
       const mockSpec = {
         paths: {
           '/core/v1/domains': {
             post: {
               operationId: 'CreateDomainWithContacts',
+              tags: ['Domains'],
               requestBody: {
                 required: true,
                 content: {
@@ -301,7 +357,7 @@ describe('Tool Generator', () => {
 
       expect(result).toBe(true);
       
-      // Should flatten nested properties with dot notation
+      // Should flatten nested properties with dot notation in the single operation tool
       const toolCall = mockServer.tool.mock.calls[0];
       const parameters = toolCall[1];
       
@@ -313,12 +369,13 @@ describe('Tool Generator', () => {
       expect(parameterKeys).toContain('contacts_registrant_lastName');
     });
 
-    it('should execute tool function correctly', async () => {
+    it('should execute consolidated tool function correctly', async () => {
       const mockSpec = {
         paths: {
           '/core/v1/domains': {
             get: {
               operationId: 'ListDomains',
+              tags: ['Domains'],
               parameters: [
                 {
                   name: 'perPage',
@@ -326,22 +383,39 @@ describe('Tool Generator', () => {
                   schema: { type: 'integer' }
                 }
               ]
+            },
+            post: {
+              operationId: 'CreateDomain',
+              tags: ['Domains'],
+              requestBody: {
+                content: {
+                  'application/json': {
+                    schema: {
+                      type: 'object',
+                      properties: {
+                        domainName: { type: 'string' }
+                      }
+                    }
+                  }
+                }
+              }
             }
           }
         }
       };
 
       mockLoadOpenApiSpec.mockResolvedValue(mockSpec);
+      mockResolveSchemaRef.mockImplementation((schema) => schema);
       mockCallNameApi.mockResolvedValue({ domains: ['example.com'] });
 
       await createToolsFromSpec(mockServer as any);
 
-      // Get the tool function that was registered
-      const toolCall = mockServer.tool.mock.calls[0];
-      const toolFunction = toolCall[2];
+      // Get the ManageDomains tool function
+      const domainsToolCall = mockServer.tool.mock.calls.find(call => call[0] === 'ManageDomains');
+      const toolFunction = domainsToolCall[2];
 
-      // Execute the tool function
-      const result = await toolFunction({ perPage: 10 });
+      // Execute the tool function with list operation
+      const result = await toolFunction({ operation: 'list', perPage: 10 });
 
       // The implementation adds query params to the URL
       expect(mockCallNameApi).toHaveBeenCalledWith('/core/v1/domains?perPage=10', 'GET', null);
@@ -355,12 +429,17 @@ describe('Tool Generator', () => {
       });
     });
 
-    it('should handle tool execution with request body', async () => {
+    it('should handle consolidated tool execution with request body', async () => {
       const mockSpec = {
         paths: {
           '/core/v1/domains': {
+            get: {
+              operationId: 'ListDomains',
+              tags: ['Domains']
+            },
             post: {
               operationId: 'CreateDomain',
+              tags: ['Domains'],
               requestBody: {
                 content: {
                   'application/json': {
@@ -385,10 +464,11 @@ describe('Tool Generator', () => {
 
       await createToolsFromSpec(mockServer as any);
 
-      const toolCall = mockServer.tool.mock.calls[0];
-      const toolFunction = toolCall[2];
+      const domainsToolCall = mockServer.tool.mock.calls.find(call => call[0] === 'ManageDomains');
+      const toolFunction = domainsToolCall[2];
 
       const result = await toolFunction({
+        operation: 'create',
         domainName: 'example.com',
         years: 1
       });
@@ -411,12 +491,13 @@ describe('Tool Generator', () => {
       });
     });
 
-    it('should handle array and object parameter types', async () => {
+    it('should handle array and object parameter types in single operation tool', async () => {
       const mockSpec = {
         paths: {
           '/core/v1/domains': {
             post: {
               operationId: 'CreateDomainWithNameservers',
+              tags: ['Domains'],
               requestBody: {
                 content: {
                   'application/json': {
@@ -447,6 +528,7 @@ describe('Tool Generator', () => {
 
       await createToolsFromSpec(mockServer as any);
 
+      // Single operation gets individual tool
       const toolCall = mockServer.tool.mock.calls[0];
       const toolFunction = toolCall[2];
 
@@ -466,37 +548,69 @@ describe('Tool Generator', () => {
         }
       );
     });
+
+    it('should exclude deprecated operations from tool generation', async () => {
+      const mockSpec = {
+        paths: {
+          '/core/v1/domains/{domainName}/enable_autorenew': {
+            post: {
+              operationId: 'EnableAutorenew',
+              tags: ['Domains'],
+              deprecated: true, // Should be excluded
+              parameters: [{ name: 'domainName', in: 'path', required: true, schema: { type: 'string' } }]
+            }
+          },
+          '/core/v1/domains': {
+            get: {
+              operationId: 'ListDomains',
+              tags: ['Domains'],
+              parameters: [{ name: 'perPage', in: 'query', schema: { type: 'integer' } }]
+            }
+          }
+        }
+      };
+
+      mockLoadOpenApiSpec.mockResolvedValue(mockSpec);
+      await createToolsFromSpec(mockServer as any);
+
+      // Should create some tool for the non-deprecated operation (could be individual or consolidated)
+      const allCalls = mockServer.tool.mock.calls.map((call: any) => call[0]);
+      expect(allCalls).toContain('ListDomains'); // Individual tool since only one operation
+
+      // Should not create tools for deprecated operations
+      const deprecatedCalls = mockServer.tool.mock.calls.filter((call: any) => call[0] === 'EnableAutorenew');
+      expect(deprecatedCalls).toHaveLength(0);
+    });
   });
 
   describe('createFallbackTools', () => {
-    it('should create fallback HelloFunc tool when OpenAPI spec is not available', () => {
+    it('should create fallback Hello tool when OpenAPI spec is not available', () => {
       createFallbackTools(mockServer as any);
 
       expect(mockServer.tool).toHaveBeenCalledWith(
-        'HelloFunc',
+        'Hello',
         {},
         expect.any(Function)
       );
     });
 
     it('should execute fallback tool function', async () => {
-      mockCallNameApi.mockResolvedValue({ message: 'Hello from Name.com API' });
-
       createFallbackTools(mockServer as any);
 
-      // Get the HelloFunc tool
-      const helloFuncCall = mockServer.tool.mock.calls.find(
-        call => call[0] === 'HelloFunc'
+      // Get the Hello tool
+      const helloCall = mockServer.tool.mock.calls.find(
+        call => call[0] === 'Hello'
       );
-      const helloFuncFunction = helloFuncCall[2];
+      const helloFunction = helloCall[2];
 
-      const result = await helloFuncFunction({});
+      const result = await helloFunction({});
 
-      expect(mockCallNameApi).toHaveBeenCalledWith('/core/v1/hello');
+      // New Hello tool doesn't call API, just returns static content
+      expect(mockCallNameApi).not.toHaveBeenCalled();
       expect(result).toEqual({
         content: [{
           type: "text",
-          text: JSON.stringify({ message: 'Hello from Name.com API' }, null, 2)
+          text: "Hello from Name.com MCP Server! 🌐\n\nThis server provides AI assistants with access to Name.com's domain management API.\n\nAvailable operations include:\n• Domain registration and management\n• DNS record management\n• Email forwarding setup\n• URL forwarding configuration\n• Account information retrieval\n\nTo get started, try asking about domain availability or listing your domains."
         }]
       });
     });

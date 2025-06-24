@@ -49,8 +49,12 @@ export interface OpenApiRequestBody {
 
 export interface OpenApiOperation {
   operationId?: string;
+  summary?: string;
+  description?: string;
   parameters?: OpenApiParameter[];
   requestBody?: OpenApiRequestBody;
+  tags?: string[];
+  deprecated?: boolean;
 }
 
 export interface OpenApiPathItem {
