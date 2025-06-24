@@ -10,7 +10,7 @@ export const EMBEDDED_SPEC = {
     },
     "description": "RESTful API for managing domains, DNS records, and related services at Name.com.  Access via HTTPS at api.name.com (production) or api.dev.name.com (testing).  Supports standard authentication, rate-limited to 20 requests/second. ",
     "title": "Name.com Core API",
-    "version": "1.0.1",
+    "version": "1.0.3",
     "termsOfService": "https://www.name.com/policies/api-access-agreement"
   },
   "servers": [
@@ -518,7 +518,7 @@ export const EMBEDDED_SPEC = {
                           "zip": "11222",
                           "country": "US",
                           "email": "support@example.com",
-                          "phone": "+1.5555555"
+                          "phone": "+15555555"
                         }
                       }
                     }
@@ -5804,12 +5804,14 @@ export const EMBEDDED_SPEC = {
           "firstName": {
             "description": "First name of the contact.",
             "type": "string",
-            "example": "John"
+            "example": "John",
+            "minLength": 1
           },
           "lastName": {
             "description": "Last name of the contact.",
             "type": "string",
-            "example": "Doe"
+            "example": "Doe",
+            "minLength": 1
           },
           "companyName": {
             "description": "Company name of the contact. Leave blank if the contact is an individual, as some registries may assume it is a corporate entity otherwise.",
@@ -5822,7 +5824,8 @@ export const EMBEDDED_SPEC = {
           "address1": {
             "description": "The first line of the contact's address.",
             "type": "string",
-            "example": "123 Main Street"
+            "example": "123 Main Street",
+            "minLength": 1
           },
           "address2": {
             "description": "The second line of the contact's address (optional).",
@@ -5835,17 +5838,20 @@ export const EMBEDDED_SPEC = {
           "city": {
             "description": "City of the contact's address.",
             "type": "string",
-            "example": "New York"
+            "example": "New York",
+            "minLength": 1
           },
           "state": {
             "description": "State or Province of the contact's address.",
             "type": "string",
-            "example": "NY"
+            "example": "NY",
+            "minLength": 1
           },
           "zip": {
             "description": "ZIP or Postal Code of the contact's address.",
             "type": "string",
-            "example": "10001"
+            "example": "10001",
+            "minLength": 1
           },
           "country": {
             "description": "Country code for the contact's address. Must be an ISO 3166-1 alpha-2 country code.",
@@ -5854,23 +5860,25 @@ export const EMBEDDED_SPEC = {
             "pattern": "^[A-Z]{2}$"
           },
           "email": {
-            "description": "Email address of the contact. Must be a valid email format.",
+            "description": "Email address of the contact. Must be a valid email format. The validation is performed against the `addr-spec` syntax in [RFC 822](https://datatracker.ietf.org/doc/html/rfc822)",
             "type": "string",
             "format": "email",
             "example": "john.doe@example.com"
           },
           "phone": {
-            "description": "Phone number of the contact. Should follow the E.164 international format: \"+[country code].[number]\".",
+            "description": "Phone number of the contact. Should follow the E.164 international format: \"+[country code][number]\".",
             "type": "string",
-            "example": "+1.5551234567"
+            "pattern": "^\\+[1-9]\\d{7,14}$",
+            "example": "+15551234567"
           },
           "fax": {
-            "description": "Fax number of the contact. Should follow the E.164 international format: \"+[country code].[number]\".",
+            "description": "Fax number of the contact. Should follow the E.164 international format: \"+[country code][number]\".",
             "type": [
               "string",
               "null"
             ],
-            "example": "+1.5557654321"
+            "pattern": "^\\+[1-9]\\d{7,14}$",
+            "example": "+15557654321"
           }
         },
         "required": [
@@ -5983,7 +5991,7 @@ export const EMBEDDED_SPEC = {
                 "state": "CO",
                 "zip": "12345",
                 "country": "US",
-                "phone": "+1.3035551212",
+                "phone": "+13035551212",
                 "email": "admin@example.net"
               }
             }
@@ -6369,7 +6377,8 @@ export const EMBEDDED_SPEC = {
           },
           "digest": {
             "description": "Digest is a digest of the DNSKEY RR that is registered with the registry.",
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "digestType": {
             "format": "int32",
@@ -6378,7 +6387,8 @@ export const EMBEDDED_SPEC = {
           },
           "domainName": {
             "description": "DomainName is the domain name.",
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "keyTag": {
             "format": "int32",
@@ -6446,17 +6456,20 @@ export const EMBEDDED_SPEC = {
           "domainName": {
             "description": "DomainName is the domain part of the email address to forward.",
             "type": "string",
-            "example": "example.com"
+            "example": "example.com",
+            "minLength": 1
           },
           "emailBox": {
             "description": "EmailBox is the user portion of the email address to forward.",
             "type": "string",
-            "example": "admin"
+            "example": "admin",
+            "minLength": 1
           },
           "emailTo": {
             "description": "EmailTo is the entire email address to forward email to.",
             "type": "string",
-            "example": "webmaster@example.com"
+            "example": "webmaster@example.com",
+            "format": "email"
           }
         },
         "type": "object",
@@ -6498,12 +6511,15 @@ export const EMBEDDED_SPEC = {
           "emailBox": {
             "description": "EmailBox is the user portion of the email address to forward. If your email is \"admin@example.com\", it would just be \"admin\"",
             "type": "string",
-            "example": "admin"
+            "example": "admin",
+            "minLength": 1
           },
           "emailTo": {
             "description": "EmailTo is the entire email address to forward email to.",
             "type": "string",
-            "example": "webmaster@example.com"
+            "format": "email",
+            "example": "webmaster@example.com",
+            "minLength": 1
           }
         },
         "type": "object",
@@ -6625,7 +6641,8 @@ export const EMBEDDED_SPEC = {
         "properties": {
           "answer": {
             "description": "Answer is either the IP address for A or AAAA records; the target for ANAME, CNAME, MX, or NS records; the text for TXT records.\nFor SRV records, answer has the following format: \"{weight} {port} {target}\" e.g. \"1 5061 sip.example.org\".",
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "fqdn": {
             "description": "FQDN is the Fully Qualified Domain Name. It is the combination of the host and the domain name. It always ends in a \".\". FQDN is ignored in CreateRecord, specify via the Host field instead.",
@@ -6652,7 +6669,17 @@ export const EMBEDDED_SPEC = {
           },
           "type": {
             "description": "Type is one of the following: A, AAAA, ANAME, CNAME, MX, NS, SRV, or TXT.",
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "A",
+              "AAAA",
+              "ANAME",
+              "CNAME",
+              "MX",
+              "NS",
+              "SRV",
+              "TXT"
+            ]
           }
         },
         "required": [
@@ -6667,7 +6694,8 @@ export const EMBEDDED_SPEC = {
         "properties": {
           "answer": {
             "description": "Answer is either the IP address for A or AAAA records; the target for ANAME, CNAME, MX, or NS records; the text for TXT records.\nFor SRV records, answer has the following format: \"{weight} {port} {target}\" e.g. \"1 5061 sip.example.org\".",
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "fqdn": {
             "description": "FQDN is the Fully Qualified Domain Name. It is the combination of the host and the domain name. It always ends in a \".\". FQDN is ignored in CreateRecord, specify via the Host field instead.",
@@ -6689,7 +6717,17 @@ export const EMBEDDED_SPEC = {
           },
           "type": {
             "description": "Type is one of the following: A, AAAA, ANAME, CNAME, MX, NS, SRV, or TXT.",
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "A",
+              "AAAA",
+              "ANAME",
+              "CNAME",
+              "MX",
+              "NS",
+              "SRV",
+              "TXT"
+            ]
           }
         },
         "required": [
@@ -7138,7 +7176,8 @@ export const EMBEDDED_SPEC = {
             "description": "Nameservers is a list of the nameservers to set. Nameservers should already be set up and hosting the zone properly as some registries will verify before allowing the change.",
             "items": {
               "type": "string",
-              "example": "ns1.name.com"
+              "example": "ns1.name.com",
+              "minItems": 1
             },
             "type": "array"
           }
@@ -7671,12 +7710,14 @@ export const EMBEDDED_SPEC = {
           "authCode": {
             "description": "AuthCode is the authorization code for the transfer. Not all TLDs require authorization codes, but most do.",
             "type": "string",
-            "example": "ABC123"
+            "example": "ABC123",
+            "minLength": 1
           },
           "domainName": {
             "description": "DomainName is the domain you want to transfer to Name.com.",
             "type": "string",
-            "example": "example.com"
+            "example": "example.com",
+            "minLength": 1
           },
           "privacyEnabled": {
             "description": "PrivacyEnabled is a flag on whether to purchase Whois Privacy with the transfer.",

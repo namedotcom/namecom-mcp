@@ -9,7 +9,7 @@ info:
     (testing).  Supports standard authentication, rate-limited to 20
     requests/second. 
   title: Name.com Core API
-  version: 1.0.1
+  version: 1.0.3
   termsOfService: https://www.name.com/policies/api-access-agreement
 servers:
   - description: Testing
@@ -457,7 +457,7 @@ paths:
                         zip: '11222'
                         country: US
                         email: support@example.com
-                        phone: '+1.5555555'
+                        phone: '+15555555'
         description: >-
           CreateDomainRequest has the information that is needed to create a
           domain with the CreateDomain function.
@@ -4191,10 +4191,12 @@ components:
           description: First name of the contact.
           type: string
           example: John
+          minLength: 1
         lastName:
           description: Last name of the contact.
           type: string
           example: Doe
+          minLength: 1
         companyName:
           description: >-
             Company name of the contact. Leave blank if the contact is an
@@ -4208,6 +4210,7 @@ components:
           description: The first line of the contact's address.
           type: string
           example: 123 Main Street
+          minLength: 1
         address2:
           description: The second line of the contact's address (optional).
           type:
@@ -4218,14 +4221,17 @@ components:
           description: City of the contact's address.
           type: string
           example: New York
+          minLength: 1
         state:
           description: State or Province of the contact's address.
           type: string
           example: NY
+          minLength: 1
         zip:
           description: ZIP or Postal Code of the contact's address.
           type: string
           example: '10001'
+          minLength: 1
         country:
           description: >-
             Country code for the contact's address. Must be an ISO 3166-1
@@ -4234,24 +4240,29 @@ components:
           example: US
           pattern: ^[A-Z]{2}$
         email:
-          description: Email address of the contact. Must be a valid email format.
+          description: >-
+            Email address of the contact. Must be a valid email format. The
+            validation is performed against the `addr-spec` syntax in [RFC
+            822](https://datatracker.ietf.org/doc/html/rfc822)
           type: string
           format: email
           example: john.doe@example.com
         phone:
           description: >-
             Phone number of the contact. Should follow the E.164 international
-            format: "+[country code].[number]".
+            format: "+[country code][number]".
           type: string
-          example: '+1.5551234567'
+          pattern: ^\+[1-9]\d{7,14}$
+          example: '+15551234567'
         fax:
           description: >-
             Fax number of the contact. Should follow the E.164 international
-            format: "+[country code].[number]".
+            format: "+[country code][number]".
           type:
             - string
             - 'null'
-          example: '+1.5557654321'
+          pattern: ^\+[1-9]\d{7,14}$
+          example: '+15557654321'
       required:
         - firstName
         - lastName
@@ -4355,7 +4366,7 @@ components:
               state: CO
               zip: '12345'
               country: US
-              phone: '+1.3035551212'
+              phone: '+13035551212'
               email: admin@example.net
         apiTos: true
         tos: true
@@ -4692,6 +4703,7 @@ components:
             Digest is a digest of the DNSKEY RR that is registered with the
             registry.
           type: string
+          minLength: 1
         digestType:
           format: int32
           title: >-
@@ -4702,6 +4714,7 @@ components:
         domainName:
           description: DomainName is the domain name.
           type: string
+          minLength: 1
         keyTag:
           format: int32
           title: >-
@@ -4771,14 +4784,17 @@ components:
           description: DomainName is the domain part of the email address to forward.
           type: string
           example: example.com
+          minLength: 1
         emailBox:
           description: EmailBox is the user portion of the email address to forward.
           type: string
           example: admin
+          minLength: 1
         emailTo:
           description: EmailTo is the entire email address to forward email to.
           type: string
           example: webmaster@example.com
+          format: email
       type: object
       required:
         - domainName
@@ -4822,10 +4838,13 @@ components:
             your email is "admin@example.com", it would just be "admin"
           type: string
           example: admin
+          minLength: 1
         emailTo:
           description: EmailTo is the entire email address to forward email to.
           type: string
+          format: email
           example: webmaster@example.com
+          minLength: 1
       type: object
       required:
         - emailBox
@@ -4955,6 +4974,7 @@ components:
             For SRV records, answer has the following format: "{weight} {port}
             {target}" e.g. "1 5061 sip.example.org".
           type: string
+          minLength: 1
         fqdn:
           description: >-
             FQDN is the Fully Qualified Domain Name. It is the combination of
@@ -4995,6 +5015,15 @@ components:
             Type is one of the following: A, AAAA, ANAME, CNAME, MX, NS, SRV, or
             TXT.
           type: string
+          enum:
+            - A
+            - AAAA
+            - ANAME
+            - CNAME
+            - MX
+            - NS
+            - SRV
+            - TXT
       required:
         - type
         - host
@@ -5011,6 +5040,7 @@ components:
             For SRV records, answer has the following format: "{weight} {port}
             {target}" e.g. "1 5061 sip.example.org".
           type: string
+          minLength: 1
         fqdn:
           description: >-
             FQDN is the Fully Qualified Domain Name. It is the combination of
@@ -5045,6 +5075,15 @@ components:
             Type is one of the following: A, AAAA, ANAME, CNAME, MX, NS, SRV, or
             TXT.
           type: string
+          enum:
+            - A
+            - AAAA
+            - ANAME
+            - CNAME
+            - MX
+            - NS
+            - SRV
+            - TXT
       required:
         - type
         - answer
@@ -5478,6 +5517,7 @@ components:
           items:
             type: string
             example: ns1.name.com
+            minItems: 1
           type: array
       required:
         - nameservers
@@ -5962,10 +6002,12 @@ components:
             require authorization codes, but most do.
           type: string
           example: ABC123
+          minLength: 1
         domainName:
           description: DomainName is the domain you want to transfer to Name.com.
           type: string
           example: example.com
+          minLength: 1
         privacyEnabled:
           description: >-
             PrivacyEnabled is a flag on whether to purchase Whois Privacy with
