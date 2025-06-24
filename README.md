@@ -41,7 +41,7 @@ The `npm install` command installed the Name.com MCP server on your computer. No
 
 #### Method A: Direct Configuration (Recommended)
 
-This approach will default to Name.com's test environment. Add this configuration to your AI tool's MCP config file:
+This approach uses Name.com's test environment by default. To get started, add the configuration below to your AI tool's MCP config file. Instructions for locating the MCP config files for a few common AI tools are provided after the configuration examples.
 
 ```json
 {

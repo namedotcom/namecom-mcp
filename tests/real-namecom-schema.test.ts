@@ -148,9 +148,9 @@ describe('Real Name.com Schema Tests', () => {
       const result = await createToolsFromSpec(mockServer);
       expect(result).toBe(true);
 
-      // Find the CreateDomain tool
+      // Find the ManageDomains consolidated tool
       const createDomainCall = mockServer.tool.mock.calls.find(
-        (call: any[]) => call[0] === 'CreateDomain'
+        (call: any[]) => call[0] === 'ManageDomains'
       );
       
       expect(createDomainCall).toBeDefined();
@@ -288,9 +288,9 @@ describe('Real Name.com Schema Tests', () => {
 
       await createToolsFromSpec(mockServer);
 
-      // Find the CreateDomain tool
+      // Find the ManageDomains consolidated tool
       const createDomainCall = mockServer.tool.mock.calls.find(
-        (call: any[]) => call[0] === 'CreateDomain'
+        (call: any[]) => call[0] === 'ManageDomains'
       );
       
       expect(createDomainCall).toBeDefined();
@@ -338,7 +338,7 @@ describe('Real Name.com Schema Tests', () => {
       await createToolsFromSpec(mockServer);
 
       const emailForwardingCalls = mockServer.tool.mock.calls.filter(
-        (call: any[]) => call[0].includes('EmailForwarding')
+        (call: any[]) => call[0] === 'ManageEmailForwardings'
       );
 
       expect(emailForwardingCalls.length).toBeGreaterThan(0);
@@ -353,7 +353,7 @@ describe('Real Name.com Schema Tests', () => {
       await createToolsFromSpec(mockServer);
 
       const urlForwardingCalls = mockServer.tool.mock.calls.filter(
-        (call: any[]) => call[0].includes('URLForwarding')
+        (call: any[]) => call[0] === 'ManageURLForwardings'
       );
 
       expect(urlForwardingCalls.length).toBeGreaterThan(0);

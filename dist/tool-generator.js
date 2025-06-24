@@ -1,74 +1,35 @@
 import { z } from "zod";
 import { loadOpenApiSpec, openApiSchemaToZod, resolveSchemaRef } from "./openapi-utils.js";
 import { callNameApi } from "./api-client.js";
-import { DEFAULT_VALUES, NAME_API_URL } from "./config.js";
+import { DEFAULT_VALUES } from "./config.js";
 /**
  * Helper functions to create the help and support tools
  */
 function addHelpTools(server) {
-    server.tool("GetHelpResources", {}, async () => {
-        return {
-            content: [{
-                    type: "text",
-                    text: `# Name.com Help Resources
-
-## Documentation & Guides
-- **Knowledge Base**: https://www.name.com/support
-- **API Documentation**: https://docs.name.com
-
-## Getting Support
-- **Contact Support**: https://www.name.com/contact
-
-## Community & Resources
-- **Blog**: https://www.name.com/blog`
-                }]
-        };
-    });
-    server.tool("GetFeedbackLinks", {}, async () => {
-        return {
-            content: [{
-                    type: "text",
-                    text: `# Provide Feedback
-
-## For MCP Server Issues:
-- **GitHub Issues**: https://github.com/namedotcom/namecom-mcp/issues
-
-## For Name.com API or Service Issues:
-- **Contact Support**: https://www.name.com/contact
-
-## For Feature Requests:
-- **GitHub Discussions**: https://github.com/namedotcom/namecom-mcp/discussions`
-                }]
-        };
-    });
-    server.tool("GetTroubleshootingInfo", {}, async () => {
-        // Determine environment based on the API URL
-        const environment = NAME_API_URL.includes('dev') ? 'Development (mcp.dev.name.com)' : 'Production (mcp.name.com)';
-        return {
-            content: [{
-                    type: "text",
-                    text: `# Troubleshooting Information
-
-## Current Environment:
-- **Environment**: ${environment}
-
-## Common Issues & Quick Tips:
-
-**Authentication Issues**: Verify your NAME_USERNAME and NAME_TOKEN are correct
-
-**Connection Issues**: Check your internet connection and try the HelloFunc tool first
-
-**Domain Issues**: Confirm the domain exists in your account and check ownership
-
-**DNS Issues**: Allow time for DNS propagation (up to 48 hours)
-
-## Get More Help:
-- **Support Center**: https://www.name.com/support
-- **Contact Support**: https://www.name.com/contact
-- **MCP Server Issues**: https://github.com/namedotcom/namecom-mcp/issues`
-                }]
-        };
-    });
+    server.tool("GetHelpResources", {}, async () => ({
+        content: [
+            {
+                type: 'text',
+                text: 'Name.com Help Resources:\n• Documentation: https://www.name.com/api-docs\n• Support: https://www.name.com/support\n• API Reference: https://api.name.com/docs'
+            }
+        ]
+    }));
+    server.tool("GetFeedbackLinks", {}, async () => ({
+        content: [
+            {
+                type: 'text',
+                text: 'Feedback Links:\n• Rate this MCP server: [GitHub Issues](https://github.com/namedotcom/namecom-mcp/issues)\n• Feature requests: [GitHub Discussions](https://github.com/namedotcom/namecom-mcp/discussions)\n• Bug reports: [GitHub Issues](https://github.com/namedotcom/namecom-mcp/issues/new)'
+            }
+        ]
+    }));
+    server.tool("GetTroubleshootingInfo", {}, async () => ({
+        content: [
+            {
+                type: 'text',
+                text: 'Troubleshooting:\n• Check API credentials in environment variables\n• Verify domain ownership for domain operations\n• Check account balance for purchases\n• Review API rate limits: https://www.name.com/api-docs/rate-limits'
+            }
+        ]
+    }));
 }
 /**
  * Convert dot notation parameter names to valid MCP parameter names
@@ -144,15 +105,17 @@ function setNestedProperty(obj, path, value) {
     }
     current[keys[keys.length - 1]] = value;
 }
+// No need for hardcoded deprecated operations - we'll check the spec directly
 /**
- * Create MCP tools from OpenAPI specification
+ * Create consolidated MCP tools from OpenAPI specification
  */
 export async function createToolsFromSpec(server) {
     const spec = await loadOpenApiSpec();
     if (!spec) {
-        // Don't use console.error as it interferes with MCP protocol
         return false;
     }
+    // Group operations by tag
+    const operationsByTag = {};
     // Process each path in the spec
     for (const [pathStr, pathItem] of Object.entries(spec.paths)) {
         // Process each HTTP method for the path
@@ -161,187 +124,419 @@ export async function createToolsFromSpec(server) {
                 continue;
             const typedOperation = operation;
             const operationId = typedOperation.operationId || `${method}${pathStr.replace(/\//g, '_').replace(/[{}]/g, '')}`;
-            // Build parameter schema from OpenAPI spec
-            const params = {};
-            const pathParams = [];
-            const queryParams = [];
-            const parameterTypes = {};
-            const originalPathMap = {};
-            // Process operation parameters
-            if (typedOperation.parameters) {
-                for (const param of typedOperation.parameters) {
-                    if (param.schema) {
-                        // Check if the parameter is required (path parameters are always required)
-                        const isRequired = param.required === true || param.in === 'path';
-                        // Create Zod schema
-                        params[param.name] = openApiSchemaToZod(param.schema, isRequired)
-                            .describe(param.description || '');
-                        // Keep track of path and query parameters
-                        if (param.in === 'path') {
-                            pathParams.push(param.name);
-                        }
-                        else if (param.in === 'query') {
-                            queryParams.push(param.name);
-                        }
-                    }
-                }
+            // Skip deprecated operations
+            if (typedOperation.deprecated === true) {
+                continue;
             }
-            // Add request body parameters if applicable
-            if (typedOperation.requestBody?.content?.['application/json']?.schema) {
-                const rawBodySchema = typedOperation.requestBody.content['application/json'].schema;
-                const isBodyRequired = typedOperation.requestBody.required === true;
-                // Fully resolve the schema including all references and composition constructs (allOf, oneOf, anyOf)
-                const resolvedBodySchema = resolveSchemaRef(rawBodySchema);
-                // Handle request body properties - flatten ALL nested objects to individual parameters
-                if (resolvedBodySchema.properties) {
-                    flattenObjectProperties(resolvedBodySchema, params, '', resolvedBodySchema.required || [], parameterTypes, originalPathMap);
-                }
-                else if (resolvedBodySchema.type === 'object' && !resolvedBodySchema.properties) {
-                    // Handle case where schema is an object without explicit properties
-                    params['body'] = z.object({}).optional().describe('Request body object');
-                }
-                else if (resolvedBodySchema.type) {
-                    // Handle case where schema is a primitive type
-                    params['body'] = openApiSchemaToZod(resolvedBodySchema, isBodyRequired)
-                        .describe('Request body');
-                }
+            // Get the primary tag for this operation
+            const tag = typedOperation.tags?.[0] || 'Other';
+            if (!operationsByTag[tag]) {
+                operationsByTag[tag] = [];
             }
-            // Create the MCP tool
-            server.tool(operationId, params, async (toolParams) => {
-                try {
-                    // Start with the base path
-                    let apiPath = pathStr;
-                    // The new Core API paths already include /core/v1/ prefix
-                    // No need to modify the path since it comes directly from the OpenAPI spec
-                    // Extract path parameters, query parameters, and body parameters
-                    const pathParamValues = {};
-                    const queryParamValues = {};
-                    const bodyParams = {};
-                    // Process provided parameters
-                    for (const [key, value] of Object.entries(toolParams)) {
-                        if (value !== undefined) { // Only process defined values
-                            if (pathParams.includes(key)) {
-                                pathParamValues[key] = value;
-                            }
-                            else if (queryParams.includes(key)) {
-                                queryParamValues[key] = value;
-                            }
-                            else {
-                                // Handle flattened dot notation parameters for body
-                                let processedValue = value;
-                                // Special handling for array and object string inputs based on schema type
-                                if (typeof value === 'string' && value.trim()) {
-                                    const paramType = parameterTypes[key];
-                                    if (paramType === 'array') {
-                                        // Parse comma-separated values into array
-                                        processedValue = value.split(',').map(item => item.trim()).filter(item => item.length > 0);
-                                    }
-                                    else if (paramType === 'object') {
-                                        // Parse JSON string into object
-                                        try {
-                                            processedValue = JSON.parse(value);
-                                        }
-                                        catch (e) {
-                                            // If JSON parsing fails, keep as string - the API will handle the error
-                                            processedValue = value;
-                                        }
-                                    }
-                                    // For 'simple' type, keep as string (no processing needed)
-                                }
-                                // Use original path mapping to restore dot notation for API call
-                                const originalPath = originalPathMap[key] || key;
-                                setNestedProperty(bodyParams, originalPath, processedValue);
-                            }
-                        }
-                    }
-                    // Apply defaults for query parameters if they're not provided
-                    for (const key of queryParams) {
-                        if (queryParamValues[key] === undefined && DEFAULT_VALUES[key] !== undefined) {
-                            queryParamValues[key] = DEFAULT_VALUES[key];
-                        }
-                    }
-                    // Replace path parameters - handle both {param} and :param formats
-                    for (const [key, value] of Object.entries(pathParamValues)) {
-                        apiPath = apiPath.replace(`{${key}}`, String(value));
-                        apiPath = apiPath.replace(`:${key}`, String(value));
-                    }
-                    // Add query parameters if needed
-                    if (Object.keys(queryParamValues).length > 0) {
-                        const queryString = Object.entries(queryParamValues)
-                            .filter(([_, value]) => value !== undefined) // Skip undefined values
-                            .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
-                            .join('&');
-                        if (queryString) {
-                            apiPath = `${apiPath}${apiPath.includes('?') ? '&' : '?'}${queryString}`;
-                        }
-                    }
-                    // Make the API call with the right parameters
-                    let requestBody = null;
-                    // Only include body for POST, PUT, PATCH methods
-                    if (method === 'post' || method === 'put' || method === 'patch') {
-                        // If there are body parameters, include them
-                        if (Object.keys(bodyParams).length > 0) {
-                            // Filter out undefined values from body params
-                            const filteredBodyParams = {};
-                            for (const [key, value] of Object.entries(bodyParams)) {
-                                if (value !== undefined) {
-                                    filteredBodyParams[key] = value;
-                                }
-                            }
-                            requestBody = filteredBodyParams;
-                        }
-                    }
-                    const result = await callNameApi(apiPath, method.toUpperCase(), requestBody);
-                    return {
-                        content: [{
-                                type: "text",
-                                text: JSON.stringify(result, null, 2)
-                            }]
-                    };
-                }
-                catch (error) {
-                    const errorMessage = error instanceof Error ? error.message : String(error);
-                    return {
-                        isError: true,
-                        content: [{
-                                type: "text",
-                                text: `Error: ${errorMessage}`
-                            }]
-                    };
-                }
+            operationsByTag[tag].push({
+                operationId,
+                method,
+                path: pathStr,
+                operation: typedOperation,
+                tag
             });
         }
+    }
+    // Create consolidated tools for each tag
+    for (const [tag, operations] of Object.entries(operationsByTag)) {
+        await createConsolidatedTool(server, tag, operations);
     }
     // Add help and support tools that are always available to users
     addHelpTools(server);
     return true;
 }
 /**
- * Create fallback tools when OpenAPI spec loading fails
+ * Analyze HTTP method and path to determine operation type
  */
-export function createFallbackTools(server) {
-    // Add basic hello tool as fallback using the new Core API endpoint
-    server.tool("HelloFunc", {}, async () => {
-        try {
-            const data = await callNameApi('/core/v1/hello');
-            return {
-                content: [{
-                        type: "text",
-                        text: JSON.stringify(data, null, 2)
-                    }]
-            };
+function analyzeOperation(method, path, operationId) {
+    const upperMethod = method.toUpperCase();
+    const pathSegments = path.split('/').filter(Boolean);
+    const hasIdParam = path.includes('{');
+    // Check operationId first for specific operations
+    const opId = operationId.toLowerCase();
+    if (opId === 'setcontacts')
+        return 'setContacts';
+    if (opId === 'setnameservers')
+        return 'setNameservers';
+    if (opId === 'purchaseprivacy')
+        return 'purchasePrivacy';
+    if (opId === 'renewdomain')
+        return 'renew';
+    if (opId === 'checkavailability')
+        return 'check';
+    if (opId === 'search')
+        return 'search';
+    if (opId === 'canceltransfer')
+        return 'cancel';
+    if (opId === 'subscribetonotification')
+        return 'subscribe';
+    if (opId === 'modifysubscription')
+        return 'modify';
+    // Check for specific path patterns (colon-based operations)
+    if (path.includes(':setContacts') || pathSegments.includes('contacts'))
+        return 'setContacts';
+    if (path.includes(':setNameservers') || pathSegments.includes('nameservers'))
+        return 'setNameservers';
+    if (path.includes(':privacy') || pathSegments.includes('privacy'))
+        return 'purchasePrivacy';
+    // Standard REST patterns
+    switch (upperMethod) {
+        case 'GET':
+            return hasIdParam ? 'get' : 'list';
+        case 'POST':
+            // Special cases for domain operations based on operationId
+            if (operationId.includes('Check'))
+                return 'check';
+            if (operationId.includes('Search'))
+                return 'search';
+            if (operationId.includes('Renew'))
+                return 'renew';
+            if (operationId.includes('Transfer'))
+                return 'create';
+            return 'create';
+        case 'PUT':
+        case 'PATCH':
+            return 'update';
+        case 'DELETE':
+            return 'delete';
+        default:
+            // Fallback to operationId analysis
+            return inferOperationFromId(operationId);
+    }
+}
+/**
+ * Fallback operation inference from operationId
+ */
+function inferOperationFromId(operationId) {
+    const id = operationId.toLowerCase();
+    if (id.includes('list'))
+        return 'list';
+    if (id.includes('get'))
+        return 'get';
+    if (id.includes('create'))
+        return 'create';
+    if (id.includes('update'))
+        return 'update';
+    if (id.includes('delete'))
+        return 'delete';
+    if (id.includes('check'))
+        return 'check';
+    if (id.includes('search'))
+        return 'search';
+    if (id.includes('renew'))
+        return 'renew';
+    if (id.includes('cancel'))
+        return 'cancel';
+    if (id.includes('subscribe'))
+        return 'subscribe';
+    if (id.includes('modify'))
+        return 'modify';
+    return operationId.toLowerCase();
+}
+/**
+ * Create operation descriptions using OpenAPI metadata
+ */
+function createOperationDescriptions(tag, operations, uniqueOperations) {
+    const operationDetails = [];
+    for (const opType of uniqueOperations) {
+        const matchingOps = operations.filter(op => analyzeOperation(op.method, op.path, op.operationId) === opType);
+        if (matchingOps.length === 1) {
+            const op = matchingOps[0];
+            const summary = op.operation.summary || op.operationId;
+            const description = op.operation.description ?
+                op.operation.description.split('.')[0] + '.' : '';
+            // Add specific guidance for domain search vs availability check
+            let guidance = '';
+            if (tag.toLowerCase() === 'domains') {
+                if (opType === 'search') {
+                    guidance = ' - PREFERRED for domain discovery: Finds creative domain suggestions and alternatives based on keywords. Use this when exploring domain options or when the user wants to see what\'s available.';
+                }
+                else if (opType === 'check') {
+                    guidance = ' - Use ONLY for validating specific domains: Checks if exact domain names are available. Use this only when the user asks about specific domains they already have in mind.';
+                }
+            }
+            operationDetails.push(`"${opType}": ${summary}${description ? ' - ' + description : ''}${guidance}`);
         }
-        catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
+        else if (matchingOps.length > 1) {
+            // Use the first operation's summary as representative
+            const op = matchingOps[0];
+            const summary = op.operation.summary || `${opType} operations`;
+            operationDetails.push(`"${opType}": ${summary}`);
+        }
+        else {
+            // Fallback for operations without matches
+            operationDetails.push(`"${opType}": ${opType} operations for ${tag.toLowerCase()}`);
+        }
+    }
+    return `The operation to perform. Options:\n${operationDetails.join('\n')}`;
+}
+/**
+ * Dynamically generate tool name from tag
+ */
+function generateToolName(tag, operations) {
+    // Handle common acronyms that should stay uppercase
+    const preserveAcronyms = (text) => {
+        return text
+            .replace(/\bDns(?=[A-Z]|$)/g, 'DNS')
+            .replace(/\bDnssecs?(?=[A-Z]|$)/g, 'DNSSECs')
+            .replace(/\bUrl(?=[A-Z]|$)/g, 'URL')
+            .replace(/\bApi(?=[A-Z]|$)/g, 'API')
+            .replace(/\bHttp(?=[A-Z]|$)/g, 'HTTP')
+            .replace(/\bSsl(?=[A-Z]|$)/g, 'SSL')
+            .replace(/\bTls(?=[A-Z]|$)/g, 'TLS')
+            .replace(/\bIp(?=[A-Z]|$)/g, 'IP')
+            .replace(/\bTcp(?=[A-Z]|$)/g, 'TCP')
+            .replace(/\bUdp(?=[A-Z]|$)/g, 'UDP');
+    };
+    // Clean the tag name: remove special characters, convert to PascalCase
+    let cleanTag = tag
+        .replace(/[^a-zA-Z0-9\s]/g, '') // Remove special chars
+        .split(/\s+/) // Split on whitespace
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()) // PascalCase
+        .join('');
+    // Apply acronym preservation
+    cleanTag = preserveAcronyms(cleanTag);
+    // For single operations, use the operation name directly (like Hello, CheckAccountBalance)
+    if (operations.length === 1) {
+        const op = operations[0];
+        // Try to use a clean version of the operationId
+        if (op.operationId) {
+            // Convert from camelCase to PascalCase
+            return op.operationId.charAt(0).toUpperCase() + op.operationId.slice(1);
+        }
+        // Fallback to tag-based name
+        return cleanTag;
+    }
+    // For multi-operation tags, prefix with "Manage"
+    return `Manage${cleanTag}`;
+}
+/**
+ * Create a consolidated tool for a specific tag category
+ */
+async function createConsolidatedTool(server, tag, operations) {
+    const toolName = generateToolName(tag, operations);
+    // For single-operation tags, keep the original behavior
+    if (operations.length === 1) {
+        const op = operations[0];
+        await createSingleOperationTool(server, op);
+        return;
+    }
+    // For multi-operation tags, create consolidated tool
+    const operationEnum = operations.map(op => analyzeOperation(op.method, op.path, op.operationId)).filter(Boolean);
+    const uniqueOperations = [...new Set(operationEnum)];
+    if (uniqueOperations.length === 0) {
+        // Fallback to individual tools if we can't infer operations
+        for (const op of operations) {
+            await createSingleOperationTool(server, op);
+        }
+        return;
+    }
+    // Build operation descriptions with specific guidance
+    const operationDescriptions = createOperationDescriptions(tag, operations, uniqueOperations);
+    // Build consolidated parameter schema
+    const params = {
+        operation: z.enum(uniqueOperations)
+            .describe(operationDescriptions)
+    };
+    // Collect all possible parameters from all operations
+    const allParams = {};
+    const allParameterTypes = {};
+    const allOriginalPathMap = {};
+    for (const op of operations) {
+        const opParams = await extractOperationParameters(op);
+        Object.assign(allParams, opParams.params);
+        Object.assign(allParameterTypes, opParams.parameterTypes);
+        Object.assign(allOriginalPathMap, opParams.originalPathMap);
+    }
+    // Add all parameters as optional (they'll be validated per operation)
+    for (const [paramName, paramSchema] of Object.entries(allParams)) {
+        params[paramName] = paramSchema.optional();
+    }
+    // Create the consolidated tool
+    server.tool(toolName, params, async (toolParams) => {
+        const { operation: requestedOperation, ...otherParams } = toolParams;
+        // Find the matching operation
+        const matchingOp = operations.find(op => analyzeOperation(op.method, op.path, op.operationId) === requestedOperation);
+        if (!matchingOp) {
             return {
                 isError: true,
                 content: [{
                         type: "text",
-                        text: `Error: ${errorMessage}`
+                        text: `Error: Operation '${requestedOperation}' not supported for ${tag}`
+                    }]
+            };
+        }
+        // Execute the operation
+        return await executeOperation(matchingOp, otherParams, allParameterTypes, allOriginalPathMap);
+    });
+}
+/**
+ * Extract parameters from an operation
+ */
+async function extractOperationParameters(op) {
+    const params = {};
+    const parameterTypes = {};
+    const originalPathMap = {};
+    // Process operation parameters
+    if (op.operation.parameters) {
+        for (const param of op.operation.parameters) {
+            if (param.schema) {
+                const isRequired = param.required === true || param.in === 'path';
+                params[param.name] = openApiSchemaToZod(param.schema, isRequired)
+                    .describe(param.description || '');
+                parameterTypes[param.name] = 'simple';
+            }
+        }
+    }
+    // Add request body parameters if applicable
+    if (op.operation.requestBody?.content?.['application/json']?.schema) {
+        const rawBodySchema = op.operation.requestBody.content['application/json'].schema;
+        const resolvedBodySchema = resolveSchemaRef(rawBodySchema);
+        if (resolvedBodySchema.properties) {
+            flattenObjectProperties(resolvedBodySchema, params, '', resolvedBodySchema.required || [], parameterTypes, originalPathMap);
+        }
+    }
+    return { params, parameterTypes, originalPathMap };
+}
+/**
+ * Execute a specific operation
+ */
+async function executeOperation(op, params, parameterTypes, originalPathMap) {
+    try {
+        let apiPath = op.path;
+        const pathParams = {};
+        const queryParams = {};
+        const bodyParams = {};
+        // Categorize parameters
+        if (op.operation.parameters) {
+            for (const param of op.operation.parameters) {
+                if (params[param.name] !== undefined) {
+                    if (param.in === 'path') {
+                        pathParams[param.name] = params[param.name];
+                    }
+                    else if (param.in === 'query') {
+                        queryParams[param.name] = params[param.name];
+                    }
+                }
+            }
+        }
+        // Handle body parameters
+        for (const [key, value] of Object.entries(params)) {
+            if (value !== undefined && !pathParams[key] && !queryParams[key]) {
+                let processedValue = value;
+                // Special handling for array and object string inputs
+                if (typeof value === 'string' && value.trim()) {
+                    const paramType = parameterTypes[key];
+                    if (paramType === 'array') {
+                        processedValue = value.split(',').map(item => item.trim()).filter(item => item.length > 0);
+                    }
+                    else if (paramType === 'object') {
+                        try {
+                            processedValue = JSON.parse(value);
+                        }
+                        catch (e) {
+                            processedValue = value;
+                        }
+                    }
+                }
+                const originalPath = originalPathMap[key] || key;
+                setNestedProperty(bodyParams, originalPath, processedValue);
+            }
+        }
+        // Apply defaults for query parameters
+        for (const key of Object.keys(queryParams)) {
+            if (queryParams[key] === undefined && DEFAULT_VALUES[key] !== undefined) {
+                queryParams[key] = DEFAULT_VALUES[key];
+            }
+        }
+        // Replace path parameters
+        for (const [key, value] of Object.entries(pathParams)) {
+            apiPath = apiPath.replace(`{${key}}`, String(value));
+        }
+        // Add query parameters
+        if (Object.keys(queryParams).length > 0) {
+            const queryString = Object.entries(queryParams)
+                .filter(([_, value]) => value !== undefined)
+                .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+                .join('&');
+            if (queryString) {
+                apiPath = `${apiPath}${apiPath.includes('?') ? '&' : '?'}${queryString}`;
+            }
+        }
+        // Prepare request body
+        let requestBody = null;
+        if (['post', 'put', 'patch'].includes(op.method)) {
+            if (Object.keys(bodyParams).length > 0) {
+                const filteredBodyParams = {};
+                for (const [key, value] of Object.entries(bodyParams)) {
+                    if (value !== undefined) {
+                        filteredBodyParams[key] = value;
+                    }
+                }
+                requestBody = filteredBodyParams;
+            }
+        }
+        const result = await callNameApi(apiPath, op.method.toUpperCase(), requestBody);
+        return {
+            content: [{
+                    type: "text",
+                    text: JSON.stringify(result, null, 2)
+                }]
+        };
+    }
+    catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        return {
+            isError: true,
+            content: [{
+                    type: "text",
+                    text: `Error: ${errorMessage}`
+                }]
+        };
+    }
+}
+/**
+ * Create a single operation tool (for tags with only one operation)
+ */
+async function createSingleOperationTool(server, op) {
+    const { params, parameterTypes, originalPathMap } = await extractOperationParameters(op);
+    server.tool(op.operationId, params, async (toolParams) => {
+        return await executeOperation(op, toolParams, parameterTypes, originalPathMap);
+    });
+}
+/**
+ * Create fallback tools when OpenAPI spec loading fails
+ */
+export function createFallbackTools(server) {
+    server.tool('Hello', {}, async () => ({
+        content: [{
+                type: "text",
+                text: "Hello from Name.com MCP Server! 🌐\n\nThis server provides AI assistants with access to Name.com's domain management API.\n\nAvailable operations include:\n• Domain registration and management\n• DNS record management\n• Email forwarding setup\n• URL forwarding configuration\n• Account information retrieval\n\nTo get started, try asking about domain availability or listing your domains."
+            }]
+    }));
+    server.tool('CheckAccountBalance', {}, async () => {
+        try {
+            const result = await callNameApi('/core/v1/accountinfo/balance', 'GET');
+            return {
+                content: [{
+                        type: "text",
+                        text: `Account Balance: $${result.balance || '0.00'}`
+                    }]
+            };
+        }
+        catch (error) {
+            return {
+                isError: true,
+                content: [{
+                        type: "text",
+                        text: `Error checking account balance: ${error instanceof Error ? error.message : 'Unknown error'}`
                     }]
             };
         }
     });
-    // Add help and support tools that are always available to users (even in fallback mode)
-    addHelpTools(server);
 }
