@@ -275,7 +275,10 @@ describe('Comprehensive Tool Validation', () => {
       const testTool = toolsWithParams[0];
       mockCallNameApi.mockResolvedValueOnce({ success: true });
 
-      const result = await testTool.toolFunction({});
+      // For consolidated tools, we need to provide at least the operation parameter
+      const result = await testTool.toolFunction({
+        operation: 'list' // Use 'list' as it typically has fewer required parameters
+      });
       expect(result).toHaveProperty('content');
       expect(mockCallNameApi).toHaveBeenCalled();
     });
