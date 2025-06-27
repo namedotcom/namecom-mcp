@@ -152,8 +152,6 @@ interface ConsolidatedOperation {
   tag: string;
 }
 
-// No need for hardcoded deprecated operations - we'll check the spec directly
-
 /**
  * Create consolidated MCP tools from OpenAPI specification
  */
@@ -185,7 +183,7 @@ export async function createToolsFromSpec(server: McpServer): Promise<boolean> {
       const operationId = typedOperation.operationId || `${method}${pathStr.replace(/\//g, '_').replace(/[{}]/g, '')}`;
       
       // Skip deprecated operations
-      if (typedOperation.deprecated === true) {
+      if (typedOperation.deprecated === true || operationId === 'CreateAccount') {
         continue;
       }
       
@@ -311,13 +309,15 @@ function createOperationDescriptions(tag: string, operations: ConsolidatedOperat
       const description = op.operation.description ? 
         op.operation.description.split('.')[0] + '.' : '';
       
-      // Add specific guidance for domain search vs availability check
+      // Add specific guidance for various domain functionality
       let guidance = '';
       if (tag.toLowerCase() === 'domains') {
         if (opType === 'search') {
-          guidance = ' - PREFERRED for domain discovery: Finds creative domain suggestions and alternatives based on keywords. Use this when exploring domain options or when the user wants to see what\'s available.';
+          guidance = ' - PREFERRED for domain discovery: Finds creative domain suggestions and alternatives based on keywords. Use this when exploring domain options or when the user wants to see what\'s available. Only use TLDFilter param if the user asks for a specific TLD or TLD list. If they provide tlds with a ., ignore the . and just pass the tlds.';
         } else if (opType === 'check') {
           guidance = ' - Use ONLY for validating specific domains: Checks if exact domain names are available. Use this only when the user asks about specific domains they already have in mind.';
+        } else if (opType === 'create') {
+          guidance = ' - Creates a new domain. Use this only when the user asks to create a new domain. If the user has contact information from other owned domains, use that information. If not, get it from the user first and confirm with the user that the contact info they provided looks correct before purchasing. Do not autofill fake contact information.';
         }
       }
       
