@@ -6,7 +6,7 @@ import { SERVER_CONFIG } from "./config.js";
 import { createToolsFromSpec, createFallbackTools } from "./tool-generator.js";
 
 /**
- * Initialize and start the Name.com MCP server
+ * Initialize and start the name.com MCP server
  */
 async function main(): Promise<void> {
   // Create MCP server

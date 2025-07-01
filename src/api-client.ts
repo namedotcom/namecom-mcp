@@ -31,7 +31,7 @@ function logToFile(message: string) {
 }
 
 /**
- * Helper function to make authenticated requests to Name.com API
+ * Helper function to make authenticated requests to name.com API
  */
 export async function callNameApi(
   apiPath: string, 
@@ -73,7 +73,7 @@ export async function callNameApi(
     
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Name.com API error: ${response.status} ${response.statusText} - ${errorText}`);
+      throw new Error(`name.com API error: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
     // Handle 204 No Content responses

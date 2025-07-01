@@ -17,7 +17,7 @@ jest.mock('../src/config.js', () => ({
   NAME_API_URL: 'https://mcp.dev.name.com'
 }));
 
-describe('Real Name.com Schema Tests', () => {
+describe('Real name.com Schema Tests', () => {
   let realSpec: OpenApiSpec;
   let mockServer: any;
 
@@ -29,7 +29,7 @@ describe('Real Name.com Schema Tests', () => {
       callTool: jest.fn()
     };
 
-    // Load the actual Name.com OpenAPI spec
+    // Load the actual name.com OpenAPI spec
     try {
       const specPath = path.join(__dirname, '../assets/namecom.api.yaml');
       const specContent = fs.readFileSync(specPath, 'utf8');
@@ -380,7 +380,7 @@ describe('Real Name.com Schema Tests', () => {
     });
 
     it('should handle circular references without infinite loops', () => {
-      // This is more of a defensive test - the real Name.com spec shouldn't have circular refs
+      // This is more of a defensive test - the real name.com spec shouldn't have circular refs
       // but our resolver should handle them gracefully
       const utils = require('../src/openapi-utils.js');
       const originalSpec = utils.globalSpec;

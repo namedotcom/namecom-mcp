@@ -1,20 +1,20 @@
-# Name.com MCP Server
+# name.com MCP Server
 
 [![npm version](https://img.shields.io/npm/v/namecom-mcp.svg)](https://www.npmjs.com/package/namecom-mcp)
 [![npm downloads](https://img.shields.io/npm/dm/namecom-mcp.svg)](https://www.npmjs.com/package/namecom-mcp)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![MCP Server](https://img.shields.io/badge/MCP-Server-orange.svg)](https://modelcontextprotocol.io/)
 
-A Model Context Protocol (MCP) server that provides access to the complete Name.com API for domain management operations. This server automatically generates tools from the Name.com OpenAPI specification, giving AI assistants access to **all Name.com API functions** including domain registration, DNS management, transfers, email forwarding, URL forwarding, and more.
+A Model Context Protocol (MCP) server that provides access to the complete name.com API for domain management operations. This server automatically generates tools from the name.com OpenAPI specification, giving AI assistants access to **all name.com API functions** including domain registration, DNS management, transfers, email forwarding, URL forwarding, and more.
 
-> **⚠️ Experimental Tool**: This MCP server is currently experimental and defaults to Name.com's test environment (`mcp.dev.name.com`) which requires **test environment credentials**. While you can configure it to use the production environment, we recommend using the test environment for initial experimentation.
+> **⚠️ Experimental Tool**: This MCP server is currently experimental and defaults to name.com's test environment (`mcp.dev.name.com`) which requires **test environment credentials**. While you can configure it to use the production environment, we recommend using the test environment for initial experimentation.
 
-This MCP server works with **any AI tool that supports the Model Context Protocol (MCP)**. You can use it for domain management tasks through natural conversation with your preferred AI assistant. The server dynamically creates tools for every available Name.com API endpoint, so you have access to the full range of domain management capabilities.
+This MCP server works with **any AI tool that supports the Model Context Protocol (MCP)**. You can use it for domain management tasks through natural conversation with your preferred AI assistant. The server dynamically creates tools for every available name.com API endpoint, so you have access to the full range of domain management capabilities.
 
 ## Features
 
-- 🔄 **Complete API Access**: Dynamically creates tools for every Name.com API endpoint
-- 🛡️ **Secure Authentication**: Uses Name.com API credentials with proper authentication
+- 🔄 **Complete API Access**: Dynamically creates tools for every name.com API endpoint
+- 🛡️ **Secure Authentication**: Uses name.com API credentials with proper authentication
 - 🔧 **Easy Integration**: Simple configuration with popular AI tools
 - 🧪 **Safe Testing**: Defaults to test environment for experimentation
 - 🤖 **AI-First Design**: Built specifically for natural language interaction via MCP
@@ -25,7 +25,7 @@ This MCP server works with **any AI tool that supports the Model Context Protoco
 ### Prerequisites
 
 - **Node.js** 17+ and **npm** ([download here](https://nodejs.org/))
-- **Name.com Account** with API credentials ([sign up free](https://www.name.com/) | [help getting credentials](#getting-namecom-api-credentials))
+- **name.com Account** with API credentials ([sign up free](https://www.name.com/) | [help getting credentials](#getting-namecom-api-credentials))
 - **MCP-Compatible AI Tool** (Cursor, Claude Desktop, etc.)
 
 ### Setup
@@ -37,11 +37,11 @@ npm install -g namecom-mcp
 
 **Step 2: Choose your configuration method**
 
-The `npm install` command installed the Name.com MCP server on your computer. Now your AI tool needs to know where to find it and how to authenticate with Name.com. Choose one of the following configuration methods:
+The `npm install` command installed the name.com MCP server on your computer. Now your AI tool needs to know where to find it and how to authenticate with name.com. Choose one of the following configuration methods:
 
 #### Method A: Direct Configuration (Recommended)
 
-This approach uses Name.com's test environment by default. To get started, add the configuration below to your AI tool's MCP config file. Instructions for locating the MCP config files for a few common AI tools are provided after the configuration examples.
+This approach uses name.com's test environment by default. To get started, add the configuration below to your AI tool's MCP config file. Instructions for locating the MCP config files for a few common AI tools are provided after the configuration examples.
 
 ```json
 {
@@ -73,7 +73,7 @@ This approach uses Name.com's test environment by default. To get started, add t
 }
 ```
 
-> ⚠️ **Production Warning**: This will affect your real Name.com account and may incur charges. See [Environment Details](#environment-details) for credential requirements.
+> ⚠️ **Production Warning**: This will affect your real name.com account and may incur charges. See [Environment Details](#environment-details) for credential requirements.
 
 **Important**: Use the right credentials for your environment - test credentials for test environment, production credentials for production.
 
@@ -118,20 +118,20 @@ NAME_TOKEN=your-test-token
 
 **Step 3: You're done! 🎉**
 
-Start your AI tool and begin asking domain-related questions. Your AI assistant will automatically use the Name.com tools when needed.
+Start your AI tool and begin asking domain-related questions. Your AI assistant will automatically use the name.com tools when needed.
 
 ### Understanding the Configuration
 
 **What each setting does:**
 - **`"namecom"`**: The name for this MCP server (you can change this)
 - **`"command": "namecom-mcp"`**: Tells your AI tool to run the package you installed
-- **`"NAME_USERNAME"`**: Your Name.com API username (test credentials recommended)
-- **`"NAME_TOKEN"`**: Your Name.com API token (test credentials recommended)
+- **`"NAME_USERNAME"`**: Your name.com API username (test credentials recommended)
+- **`"NAME_TOKEN"`**: Your name.com API token (test credentials recommended)
 - **Optional**: Add `"NAME_API_URL": "https://mcp.name.com"` for production environment
 
 ## ✅ Setup Complete - You're Ready to Go!
 
-Congratulations! Your Name.com MCP server is now configured and ready to use with your AI assistant.
+Congratulations! Your name.com MCP server is now configured and ready to use with your AI assistant.
 
 ### Quick Test
 Start your AI tool and ask: **"Can you check if example.com is available?"**
@@ -140,7 +140,7 @@ If your AI assistant responds and searches for domains, you're all set! 🎉
 
 **What you can do now:**
 - Begin asking any domain-related questions in natural language
-- Your AI assistant will automatically use the Name.com tools when needed
+- Your AI assistant will automatically use the name.com tools when needed
 
 ## 🚀 Quick Example
 
@@ -151,7 +151,7 @@ Now that you're set up, here's what you can do:
 
 **Your AI assistant will:**
 1. Ask permission to use the domain search tool
-2. Search Name.com's test environment safely
+2. Search name.com's test environment safely
 3. Show you available options with pricing
 4. Help you register if you want (in test mode)
 
@@ -163,18 +163,18 @@ Now that you're set up, here's what you can do:
 
 ## Environment Details
 
-Understanding the different Name.com environments and their credentials:
+Understanding the different name.com environments and their credentials:
 
 ### Test Environment (Default - Recommended)
 - **URL**: `https://mcp.dev.name.com` (default)
-- **Credentials**: Use your **test username and token** from Name.com
+- **Credentials**: Use your **test username and token** from name.com
 - **Safety**: Operations won't affect real domains or billing
 - **Purpose**: Safe experimentation and testing
 
 ### Production Environment (Advanced)
 - **URL**: `https://mcp.name.com` (set `NAME_API_URL=https://mcp.name.com`)
-- **Credentials**: Use your **production username and token** from Name.com
-- **⚠️ **DANGER**: All operations affect your real Name.com account and domains
+- **Credentials**: Use your **production username and token** from name.com
+- **⚠️ **DANGER**: All operations affect your real name.com account and domains
 - **Billing**: Domain registrations and services will incur real charges
 - **Purpose**: Live domain management
 
@@ -185,16 +185,16 @@ Understanding the different Name.com environments and their credentials:
 
 Using wrong credentials will result in authentication errors.
 
-## Getting Name.com API Credentials
+## Getting name.com API Credentials
 
 If you need to generate new API credentials or want to understand the different environments:
 
-**IMPORTANT**: Name.com provides different credentials for test vs production environments. Make sure you're using the correct credentials for your chosen environment.
+**IMPORTANT**: name.com provides different credentials for test vs production environments. Make sure you're using the correct credentials for your chosen environment.
 
-1. Log in to your Name.com account
+1. Log in to your name.com account
 2. Go to Account Settings > API Tokens
 3. Generate an API token
-4. **Note**: When you generate a token, Name.com provides:
+4. **Note**: When you generate a token, name.com provides:
    - **Test credentials** (username/token) for `mcp.dev.name.com`
    - **Production credentials** (username/token) for `mcp.name.com`
 5. Copy the correct username and token for the environment you plan to use
@@ -211,7 +211,7 @@ The following section is for testing and troubleshooting your setup. If everythi
 - "Show me the DNS records for my domain"
 - "Help me register a new domain"
 
-Your AI tool will request permission to use Name.com tools, and the conversation should flow naturally.
+Your AI tool will request permission to use name.com tools, and the conversation should flow naturally.
 
 ---
 
@@ -240,18 +240,18 @@ The MCP Inspector is **excellent for testing and troubleshooting** your MCP serv
 
 4. **Test the Connection**:
    - Click "Connect" in the left sidebar
-   - Once connected, click "List Tools" in the center to see all available Name.com API tools
+   - Once connected, click "List Tools" in the center to see all available name.com API tools
    - Select any tool to test that the endpoints are working through the MCP server
    - If you dont see any errors, but only a couple tools show up, there may have been an issue parsing the OpenAPI spec on startup. Please report this issue.
 
 ## Security & Performance
 
-- **API Token Security**: Treat your Name.com API token like a password
+- **API Token Security**: Treat your name.com API token like a password
 - **Safe Testing**: Default test environment provides safe experimentation
-- **Least Privilege**: The server only accesses Name.com APIs with the permissions of your API token
+- **Least Privilege**: The server only accesses name.com APIs with the permissions of your API token
 - **Input Validation**: All inputs are validated using Zod schemas
 - **Error Handling**: Errors are handled gracefully without exposing sensitive information
-- **API Rate Limits**: Respects Name.com's standard rate limits
+- **API Rate Limits**: Respects name.com's standard rate limits
 - **Fast Startup**: Tool generation takes ~2-3 seconds on first startup
 
 ## Troubleshooting
@@ -291,13 +291,13 @@ For npm installation or permission issues, see the official documentation:
 If you run into issues:
 1. Check the troubleshooting section above
 2. Test with the MCP Inspector first to isolate configuration issues
-3. Verify your credentials work with Name.com's API directly
+3. Verify your credentials work with name.com's API directly
 4. Check [GitHub Issues](https://github.com/namedotcom/namecom-mcp/issues) for known issues
 5. Report bugs or request features on [GitHub Issues](https://github.com/namedotcom/namecom-mcp/issues)
 
-**For Name.com account or API issues:**
-- [Name.com Support](https://www.name.com/support) - Account and billing support
-- [Name.com API Documentation](https://docs.name.com) - API reference and guides
+**For name.com account or API issues:**
+- [name.com Support](https://www.name.com/support) - Account and billing support
+- [name.com API Documentation](https://docs.name.com) - API reference and guides
 
 ## FAQ
 
@@ -314,14 +314,14 @@ A: Yes, set `NAME_API_URL=https://mcp.name.com` and use production credentials. 
 A: Usually mismatched credentials - test credentials work with test environment, production credentials with production environment. [See Environment Details](#environment-details) for credential requirements.
 
 **Q: How much does it cost?**
-A: The MCP server is free. You only pay for actual Name.com services you use.
+A: The MCP server is free. You only pay for actual name.com services you use.
 
 **Q: Does it work offline?**
-A: No, it needs internet access to communicate with Name.com's API.
+A: No, it needs internet access to communicate with name.com's API.
 
 ## MCP Ecosystem
 
-This server is part of the growing Model Context Protocol ecosystem. The MCP is rapidly gaining adoption across AI tools, and this Name.com server works with any MCP-compatible tool, giving you flexibility in choosing your preferred AI assistant for domain management tasks.
+This server is part of the growing Model Context Protocol ecosystem. The MCP is rapidly gaining adoption across AI tools, and this name.com server works with any MCP-compatible tool, giving you flexibility in choosing your preferred AI assistant for domain management tasks.
 
 **Related MCP Resources:**
 - **[MCP Inspector](https://github.com/modelcontextprotocol/inspector)**: Debug and test MCP servers
@@ -335,7 +335,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ## Support
 
 - **Issues**: Report bugs and feature requests on [GitHub Issues](https://github.com/namedotcom/namecom-mcp/issues)
-- **Documentation**: See the [Name.com API Documentation](https://docs.name.com) for API details
+- **Documentation**: See the [name.com API Documentation](https://docs.name.com) for API details
 - **MCP Protocol**: Learn more about [Model Context Protocol](https://modelcontextprotocol.io/)
 
 ## Changelog

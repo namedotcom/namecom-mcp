@@ -28,7 +28,7 @@ function logToFile(message) {
     }
 }
 /**
- * Helper function to make authenticated requests to Name.com API
+ * Helper function to make authenticated requests to name.com API
  */
 export async function callNameApi(apiPath, method = "GET", body = null) {
     const credentials = Buffer.from(`${NAME_USERNAME}:${NAME_TOKEN}`).toString('base64');
@@ -58,7 +58,7 @@ export async function callNameApi(apiPath, method = "GET", body = null) {
         const response = await fetch(fullUrl, options);
         if (!response.ok) {
             const errorText = await response.text();
-            throw new Error(`Name.com API error: ${response.status} ${response.statusText} - ${errorText}`);
+            throw new Error(`name.com API error: ${response.status} ${response.statusText} - ${errorText}`);
         }
         // Handle 204 No Content responses
         if (response.status === 204) {

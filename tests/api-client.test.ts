@@ -141,7 +141,7 @@ describe('API Client', () => {
       });
 
       await expect(callNameApi('/core/v1/error')).rejects.toThrow(
-        'Name.com API error: 404 Not Found - Domain not found'
+        'name.com API error: 404 Not Found - Domain not found'
       );
     });
 

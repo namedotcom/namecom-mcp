@@ -10,7 +10,7 @@ jest.mock('../src/config.js', () => ({
     dir: 'asc'
   },
   SERVER_CONFIG: {
-    name: 'Name.com API',
+    name: 'name.com API',
     version: '1.0.0'
   }
 }));
@@ -39,7 +39,7 @@ describe('Configuration', () => {
     const config = await import('../src/config.js');
     
     expect(config.SERVER_CONFIG).toEqual({
-      name: 'Name.com API',
+      name: 'name.com API',
       version: '1.0.0'
     });
   });

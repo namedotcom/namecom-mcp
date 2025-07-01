@@ -17,7 +17,7 @@ for (const envPath of possibleEnvPaths) {
         // Continue to next path
     }
 }
-// Name.com API credentials
+// name.com API credentials
 export const NAME_USERNAME = process.env.NAME_USERNAME;
 export const NAME_TOKEN = process.env.NAME_TOKEN;
 // Validate and set API URL - only allow MCP routes
@@ -47,11 +47,11 @@ export const NAME_API_URL = validateAndSetApiUrl();
 // Validate required credentials
 if (!NAME_USERNAME || !NAME_TOKEN) {
     process.stderr.write(`
-Error: Missing required Name.com API credentials.
+Error: Missing required name.com API credentials.
 
 Please set the following environment variables:
-- NAME_USERNAME: Your Name.com username
-- NAME_TOKEN: Your Name.com API token
+- NAME_USERNAME: Your name.com username
+- NAME_TOKEN: Your name.com API token
 
 You can either:
 1. Create a .env file with these variables
@@ -71,6 +71,6 @@ export const DEFAULT_VALUES = {
 };
 // Server configuration
 export const SERVER_CONFIG = {
-    name: "Name.com API",
+    name: "name.com API",
     version: "1.0.0"
 };
