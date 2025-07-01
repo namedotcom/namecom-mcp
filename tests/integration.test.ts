@@ -13,7 +13,7 @@ jest.mock('../src/config.js', () => ({
 
 import { callNameApi } from '../src/api-client.js';
 
-describe('Name.com API Integration Tests', () => {
+describe('name.com API Integration Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockFetchGlobal.mockClear();
@@ -285,7 +285,7 @@ describe('Name.com API Integration Tests', () => {
       });
 
       await expect(callNameApi('/core/v1/domains/nonexistent.com')).rejects.toThrow(
-        'Name.com API error: 404 Not Found - Domain not found'
+        'name.com API error: 404 Not Found - Domain not found'
       );
     });
 
@@ -298,7 +298,7 @@ describe('Name.com API Integration Tests', () => {
       });
 
       await expect(callNameApi('/core/v1/domains')).rejects.toThrow(
-        'Name.com API error: 401 Unauthorized - Invalid credentials'
+        'name.com API error: 401 Unauthorized - Invalid credentials'
       );
     });
 
@@ -311,7 +311,7 @@ describe('Name.com API Integration Tests', () => {
       });
 
       await expect(callNameApi('/core/v1/domains')).rejects.toThrow(
-        'Name.com API error: 429 Too Many Requests - Rate limit exceeded'
+        'name.com API error: 429 Too Many Requests - Rate limit exceeded'
       );
     });
 
@@ -324,7 +324,7 @@ describe('Name.com API Integration Tests', () => {
       });
 
       await expect(callNameApi('/core/v1/domains')).rejects.toThrow(
-        'Name.com API error: 500 Internal Server Error - Server error occurred'
+        'name.com API error: 500 Internal Server Error - Server error occurred'
       );
     });
   });

@@ -1,7 +1,7 @@
 {
   "name": "namecom-mcp",
   "version": "1.0.7",
-  "description": "A Model Context Protocol (MCP) server for Name.com API integration, providing AI assistants with domain management capabilities",
+  "description": "A Model Context Protocol (MCP) server for name.com API integration, providing AI assistants with domain management capabilities",
   "main": "dist/index.js",
   "type": "module",
   "bin": {
@@ -35,7 +35,7 @@
     "assistant",
     "claude"
   ],
-  "author": "Name.com Engineering",
+  "author": "name.com Engineering",
   "license": "MIT",
   "repository": {
     "type": "git",

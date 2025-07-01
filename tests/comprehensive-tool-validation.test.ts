@@ -51,7 +51,7 @@ describe('Comprehensive Tool Validation', () => {
       callTool: jest.fn()
     };
 
-    // Load the actual Name.com OpenAPI spec
+    // Load the actual name.com OpenAPI spec
     try {
       const specPath = path.join(__dirname, '../assets/namecom.api.yaml');
       const specContent = fs.readFileSync(specPath, 'utf8');
@@ -231,7 +231,7 @@ describe('Comprehensive Tool Validation', () => {
       // If we only have 1 test, we'll be more lenient since consolidation reduces tool count
     });
 
-    it('should generate tools for all major Name.com API categories', () => {
+    it('should generate tools for all major name.com API categories', () => {
       const toolNames = toolMetrics.toolNames;
       
       const expectedCategories = [

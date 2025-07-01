@@ -10,7 +10,7 @@ function addHelpTools(server) {
         content: [
             {
                 type: 'text',
-                text: 'Name.com Help Resources:\n• Documentation: https://www.name.com/api-docs\n• Support: https://www.name.com/support\n• API Reference: https://api.name.com/docs'
+                text: 'name.com Help Resources:\n• Documentation: https://www.name.com/api-docs\n• Support: https://www.name.com/support\n• API Reference: https://api.name.com/docs'
             }
         ]
     }));
@@ -537,7 +537,7 @@ export function createFallbackTools(server) {
     server.tool('Hello', {}, async () => ({
         content: [{
                 type: "text",
-                text: "Hello from Name.com MCP Server! 🌐\n\nThis server provides AI assistants with access to Name.com's domain management API.\n\nAvailable operations include:\n• Domain registration and management\n• DNS record management\n• Email forwarding setup\n• URL forwarding configuration\n• Account information retrieval\n\nTo get started, try asking about domain availability or listing your domains."
+                text: "Hello from name.com MCP Server! 🌐\n\nThis server provides AI assistants with access to name.com's domain management API.\n\nAvailable operations include:\n• Domain registration and management\n• DNS record management\n• Email forwarding setup\n• URL forwarding configuration\n• Account information retrieval\n\nTo get started, try asking about domain availability or listing your domains."
             }]
     }));
     server.tool('CheckAccountBalance', {}, async () => {
