@@ -1,9 +1,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { OpenApiOperation, OpenApiSpec } from "./types.js";
-import { loadOpenApiSpec, openApiSchemaToZod, resolveSchemaRef, getSchemaExample } from "./openapi-utils.js";
+import { loadOpenApiSpec, openApiSchemaToZod, resolveSchemaRef } from "./openapi-utils.js";
 import { callNameApi } from "./api-client.js";
-import { DEFAULT_VALUES, NAME_API_URL } from "./config.js";
+import { DEFAULT_VALUES } from "./config.js";
 
 /**
  * Helper functions to create the help and support tools
@@ -58,9 +58,28 @@ function sanitizeParameterName(name: string): string {
 }
 
 /**
+ * Convert underscore notation back to dot notation for API requests
+ * e.g., "account_contacts_admin_firstName" becomes "account.contacts.admin.firstName"
+ */
+function desanitizeParameterName(name: string): string {
+  return name.replace(/_/g, '.');
+}
+
+/**
+ * Convert camelCase or snake_case to readable text
+ */
+function humanizePropertyName(name: string): string {
+  const lastPart = name.split(/[._]/).pop() || name;
+  return lastPart
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/^./, str => str.toUpperCase())
+    .trim();
+}
+
+/**
  * Recursively flatten object properties into individual parameters with sanitized names
  */
-function flattenObjectProperties(
+export function flattenObjectProperties(
   schema: any, 
   params: Record<string, z.ZodTypeAny>, 
   prefix: string, 
@@ -91,31 +110,87 @@ function flattenObjectProperties(
       );
     } else if (resolvedPropSchema.type === 'object' && resolvedPropSchema.additionalProperties) {
       // Handle objects with additionalProperties (like tldRequirements)
-      // Treat as a simple string input that will be parsed as JSON
-      const description = resolvedPropSchema.description || `Key-value object: ${fullPropName}`;
+      const description = `${isPropRequired ? 'REQUIRED' : 'OPTIONAL'} - ${resolvedPropSchema.description?.split('.')[0] || 'Key-value object'}`;
       params[sanitizedPropName] = z.string().optional()
-        .describe(description + ' (JSON string: {"key1":"value1","key2":"value2"})');
+        .describe(description);
       parameterTypes[sanitizedPropName] = 'object';
     } else if (resolvedPropSchema.type === 'array' && resolvedPropSchema.items) {
       const itemSchema = resolveSchemaRef(resolvedPropSchema.items);
       
       if (itemSchema.type === 'object' && itemSchema.properties) {
-        // For arrays of objects, create a single parameter that accepts the array
-        const description = resolvedPropSchema.description || `Array of objects: ${fullPropName}`;
+        const description = `${isPropRequired ? 'REQUIRED' : 'OPTIONAL'} - ${resolvedPropSchema.description?.split('.')[0] || 'Array of objects'}`;
         params[sanitizedPropName] = openApiSchemaToZod(resolvedPropSchema, isPropRequired)
           .describe(description);
         parameterTypes[sanitizedPropName] = 'array';
       } else {
-        // For arrays of simple types (like string arrays for nameservers)
-        // Treat as a simple string input that will be parsed as comma-separated values
-        const description = resolvedPropSchema.description || `Array of ${itemSchema.type || 'values'}: ${fullPropName}`;
+        const description = `${isPropRequired ? 'REQUIRED' : 'OPTIONAL'} - ${resolvedPropSchema.description?.split('.')[0] || `Array of ${itemSchema.type || 'values'}`}`;
         params[sanitizedPropName] = z.string().optional()
-          .describe(description + ' (comma-separated: ns1.example.com,ns2.example.com)');
+          .describe(description);
         parameterTypes[sanitizedPropName] = 'array';
       }
     } else {
       // For simple properties (string, number, boolean)
-      const description = resolvedPropSchema.description || `Parameter: ${fullPropName}`;
+      let baseDescription = resolvedPropSchema.title || 
+                          resolvedPropSchema.description?.split('.')[0] || 
+                          humanizePropertyName(fullPropName);
+      
+      // Special handling for purchasePrice based on schema requirements
+      if (propName === 'purchasePrice') {
+        baseDescription = 'Required ONLY for premium domains (where domain search/check shows premium: true). For standard domains (premium: false): ALWAYS OMIT this parameter - registration will auto-calculate total cost (including multi-year), renewal will use standard pricing, and transfer will use standard pricing';
+      }
+      
+      let description = `${isPropRequired ? 'REQUIRED' : 'OPTIONAL'} - ${baseDescription}`;
+      
+      // Add example if present
+      if (resolvedPropSchema.example) {
+        description += ` (e.g., ${resolvedPropSchema.example})`;
+      }
+      
+      // Add pattern information if present
+      if (resolvedPropSchema.pattern) {
+        description += ` (must match pattern: ${resolvedPropSchema.pattern})`;
+      }
+      
+      // Add enum information if present
+      if (resolvedPropSchema.enum) {
+        description += ` (valid values: ${resolvedPropSchema.enum.join(', ')})`;
+      }
+      
+      // Add min/max information if present
+      if (resolvedPropSchema.minLength !== undefined) {
+        description += ` (min length: ${resolvedPropSchema.minLength})`;
+      }
+      if (resolvedPropSchema.maxLength !== undefined) {
+        description += ` (max length: ${resolvedPropSchema.maxLength})`;
+      }
+      if (resolvedPropSchema.minimum !== undefined) {
+        description += ` (min value: ${resolvedPropSchema.minimum})`;
+      }
+      if (resolvedPropSchema.maximum !== undefined) {
+        description += ` (max value: ${resolvedPropSchema.maximum})`;
+      }
+      
+      // Add nullable information if explicitly set
+      if (resolvedPropSchema.nullable === true) {
+        description += ' (null values allowed)';
+      }
+      
+      // Add validation combinations if present
+      if (resolvedPropSchema.allOf) {
+        description += ' (must satisfy all conditions)';
+      }
+      if (resolvedPropSchema.oneOf) {
+        description += ' (must satisfy exactly one condition)';
+      }
+      if (resolvedPropSchema.anyOf) {
+        description += ' (must satisfy at least one condition)';
+      }
+      
+      // For optional parameters, add default value if specified in schema
+      if (!isPropRequired && resolvedPropSchema.default !== undefined) {
+        description += ` (defaults to: ${resolvedPropSchema.default})`;
+      }
+      
       params[sanitizedPropName] = openApiSchemaToZod(resolvedPropSchema, isPropRequired)
         .describe(description);
       parameterTypes[sanitizedPropName] = 'simple';
@@ -124,7 +199,8 @@ function flattenObjectProperties(
 }
 
 /**
- * Set a nested property using dot notation (e.g., "domain.contacts.registrant.firstName")
+ * Set a nested property using dot notation
+ * e.g., "domain.contacts.registrant.firstName" sets obj.domain.contacts.registrant.firstName
  */
 function setNestedProperty(obj: any, path: string, value: any): void {
   const keys = path.split('.');
@@ -310,26 +386,26 @@ function createOperationDescriptions(tag: string, operations: ConsolidatedOperat
         op.operation.description.split('.')[0] + '.' : '';
       
       // Add specific guidance for various domain functionality
-      let guidance = '';
+      let guidance = ' - Parameter names must be used exactly as listed (e.g., `domain_domainName`). Do not modify or simplify.';
       if (tag.toLowerCase() === 'domains') {
         if (opType === 'search') {
-          guidance = ' - PREFERRED for domain discovery: Finds creative domain suggestions and alternatives based on keywords. Use this when exploring domain options or when the user wants to see what\'s available. Only use TLDFilter param if the user asks for a specific TLD or TLD list. If they provide tlds with a ., ignore the . and just pass the tlds.';
+          guidance += ' For domain discovery: finds creative suggestions. Use TLDFilter only if a specific TLD/list is requested; ignore \`.\` in TLDs.';
         } else if (opType === 'check') {
-          guidance = ' - Use ONLY for validating specific domains: Checks if exact domain names are available. Use this only when the user asks about specific domains they already have in mind.';
+          guidance += ' Use ONLY for validating specific domains: checks exact domain availability. Use only when user asks about specific domains.';
         } else if (opType === 'create') {
-          guidance = ' - Creates a new domain. Use this only when the user asks to create a new domain. If the user has contact information from other owned domains, use that information. If not, get it from the user first and confirm with the user that the contact info they provided looks correct before purchasing. Do not autofill fake contact information.';
+          guidance += ' Creates a new domain. Use only when user asks to create. If contact info from other domains exists, use it. Otherwise, get and confirm contact info from user before purchasing; do not autofill fake contact information.';
         }
       }
       
-      operationDetails.push(`"${opType}": ${summary}${description ? ' - ' + description : ''}${guidance}`);
-    } else if (matchingOps.length > 1) {
+      operationDetails.push(`${opType}: ${summary}${description ? ' - ' + description : ''}${guidance}`);
+    } else if (matchingOps.length > 0) {
       // Use the first operation's summary as representative
       const op = matchingOps[0];
       const summary = op.operation.summary || `${opType} operations`;
-      operationDetails.push(`"${opType}": ${summary}`);
+      operationDetails.push(`${opType}: ${summary}`);
     } else {
       // Fallback for operations without matches
-      operationDetails.push(`"${opType}": ${opType} operations for ${tag.toLowerCase()}`);
+      operationDetails.push(`${opType}: ${opType} operations for ${tag.toLowerCase()}`);
     }
   }
   
@@ -405,31 +481,86 @@ async function createConsolidatedTool(server: McpServer, tag: string, operations
     }
     return;
   }
-  
+
   // Build operation descriptions with specific guidance
   const operationDescriptions = createOperationDescriptions(tag, operations, uniqueOperations);
   
   // Build consolidated parameter schema
   const params: Record<string, z.ZodTypeAny> = {
-    operation: z.enum(uniqueOperations as [string, ...string[]])
+    operation: z.enum([uniqueOperations[0], ...uniqueOperations.slice(1)])
       .describe(operationDescriptions)
   };
+
+  // Track parameters and their requirements per operation
+  const operationParams: Record<string, {
+    required: Set<string>;
+    optional: Set<string>;
+  }> = {};
   
-  // Collect all possible parameters from all operations
+  // Initialize operation parameter tracking
+  for (const opType of uniqueOperations) {
+    operationParams[opType] = {
+      required: new Set<string>(),
+      optional: new Set<string>()
+    };
+  }
+
+  // Collect operation-specific parameters
+  for (const op of operations) {
+    const opType = analyzeOperation(op.method, op.path, op.operationId, op.operation);
+    const { params: opParams } = await extractOperationParameters(op);
+    
+    // Check each parameter's requirements for this operation
+    for (const [paramName, paramSchema] of Object.entries(opParams)) {
+      if (!paramSchema.isOptional()) {
+        operationParams[opType].required.add(paramName);
+      } else {
+        operationParams[opType].optional.add(paramName);
+      }
+    }
+  }
+  
+  // Collect all unique parameters
   const allParams: Record<string, z.ZodTypeAny> = {};
   const allParameterTypes: Record<string, 'array' | 'object' | 'simple'> = {};
   const allOriginalPathMap: Record<string, string> = {};
   
   for (const op of operations) {
-    const opParams = await extractOperationParameters(op);
-    Object.assign(allParams, opParams.params);
-    Object.assign(allParameterTypes, opParams.parameterTypes);
-    Object.assign(allOriginalPathMap, opParams.originalPathMap);
+    const { params: opParams, parameterTypes, originalPathMap } = await extractOperationParameters(op);
+    Object.assign(allParams, opParams);
+    Object.assign(allParameterTypes, parameterTypes);
+    Object.assign(allOriginalPathMap, originalPathMap);
   }
   
-  // Add all parameters as optional (they'll be validated per operation)
+  // Add parameters with operation-specific requirements
   for (const [paramName, paramSchema] of Object.entries(allParams)) {
-    params[paramName] = paramSchema.optional();
+    // Find which operations use this parameter
+    const requiredBy = uniqueOperations.filter(opType => 
+      operationParams[opType].required.has(paramName)
+    );
+    const optionalFor = uniqueOperations.filter(opType => 
+      operationParams[opType].optional.has(paramName)
+    );
+    
+    // Get the original description without the REQUIRED/OPTIONAL prefix
+    const baseDescription = (paramSchema.description || '').replace(/^(REQUIRED|OPTIONAL) - /, '');
+    
+    // Build the new description
+    let newDescription = '';
+    if (requiredBy.length > 0) {
+      newDescription = `REQUIRED for: ${requiredBy.join(', ')}`;
+      if (optionalFor.length > 0) {
+        newDescription += `, OPTIONAL for: ${optionalFor.join(', ')}`;
+      }
+      newDescription += ` - ${baseDescription}`;
+      // Make it required if it's required for all operations
+      params[paramName] = requiredBy.length === uniqueOperations.length ? 
+        paramSchema.describe(newDescription) :
+        paramSchema.optional().describe(newDescription);
+    } else if (optionalFor.length > 0) {
+      newDescription = `OPTIONAL for: ${optionalFor.join(', ')} - ${baseDescription}`;
+      params[paramName] = paramSchema.optional().describe(newDescription);
+    }
   }
   
   // Create the consolidated tool
@@ -450,6 +581,36 @@ async function createConsolidatedTool(server: McpServer, tag: string, operations
           content: [{
             type: "text",
             text: `Error: Operation '${requestedOperation}' not supported for ${tag}`
+          }]
+        };
+      }
+      
+      // Get valid parameters for this operation
+      const opParamInfo = operationParams[requestedOperation];
+      const validParams = new Set([...opParamInfo.required, ...opParamInfo.optional]);
+      
+      // Check for invalid parameters
+      const invalidParams = Object.keys(otherParams).filter(param => !validParams.has(param));
+      if (invalidParams.length > 0) {
+        const validParamsList = [...validParams].sort().join(', ');
+        const requiredParamsList = [...opParamInfo.required].sort().join(', ');
+        return {
+          isError: true,
+          content: [{
+            type: "text",
+            text: `Error: Invalid parameters for operation '${requestedOperation}': ${invalidParams.join(', ')}\n\nValid parameters:\nRequired: ${requiredParamsList || 'none'}\nOptional: ${validParamsList}`
+          }]
+        };
+      }
+      
+      // Check for missing required parameters
+      const missingRequired = [...opParamInfo.required].filter(param => !(param in otherParams));
+      if (missingRequired.length > 0) {
+        return {
+          isError: true,
+          content: [{
+            type: "text",
+            text: `Error: Missing required parameters for operation '${requestedOperation}':\n${missingRequired.map(param => `- ${param}: ${params[param].description}`).join('\n')}`
           }]
         };
       }
@@ -477,8 +638,10 @@ async function extractOperationParameters(op: ConsolidatedOperation): Promise<{
     for (const param of op.operation.parameters) {
       if (param.schema) {
         const isRequired = param.required === true || param.in === 'path';
+        const description = (param.description || '') + 
+          ` (${isRequired ? 'Required' : 'Optional'}${param.in === 'path' ? ', path parameter' : ''})`;
         params[param.name] = openApiSchemaToZod(param.schema, isRequired)
-          .describe(param.description || '');
+          .describe(description);
         parameterTypes[param.name] = 'simple';
       }
     }
@@ -552,7 +715,8 @@ async function executeOperation(
           }
         }
         
-        const originalPath = originalPathMap[key] || key;
+        // Convert underscore parameter name back to dot notation for the API
+        const originalPath = originalPathMap[key] || desanitizeParameterName(key);
         setNestedProperty(bodyParams, originalPath, processedValue);
       }
     }
@@ -641,30 +805,39 @@ async function createSingleOperationTool(server: McpServer, op: ConsolidatedOper
 }
 
 /**
- * Create fallback tools when OpenAPI spec loading fails
+ * Create error guidance tools when OpenAPI spec loading fails
  */
 export function createFallbackTools(server: McpServer): void {
   server.tool(
-    'Hello',
+    'GetSetupHelp',
     {},
     async () => ({
       content: [{
         type: "text",
-        text: "Hello from the name.com MCP Server! 🌐\n\nThis server provides AI assistants with access to name.com's domain management API.\n\nAvailable operations include:\n• Domain registration and management\n• DNS record management\n• Email forwarding setup\n• URL forwarding configuration\n• Account information retrieval\n\nTo get started, try asking about domain availability or listing your domains."
+        text: "⚠️ The name.com MCP server is not configured correctly.\n\n" +
+              "To fix this:\n" +
+              "1. Check environment variables:\n" +
+              "   NAME_USERNAME, NAME_TOKEN\n\n" +
+              "2. Verify API credentials at name.com\n\n" +
+              "3. Resources:\n" +
+              "   • API Docs: https://docs.name.com\n" +
+              "   • Support: https://www.name.com/support\n" +
+              "   • Issues: https://github.com/namedotcom/namecom-mcp/issues"
       }]
     })
   );
-  
+
   server.tool(
-    'CheckAccountBalance',
+    'CheckConfiguration',
     {},
     async () => {
       try {
-        const result = await callNameApi('/core/v1/accountinfo/balance', 'GET');
+        await callNameApi('/core/v1/hello', 'GET');
         return {
           content: [{
             type: "text",
-            text: `Account Balance: $${result.balance || '0.00'}`
+            text: "✅ API credentials are valid but the OpenAPI spec failed to load.\n\n" +
+                  "Try: restart server, check connection, or report issue"
           }]
         };
       } catch (error) {
@@ -672,7 +845,8 @@ export function createFallbackTools(server: McpServer): void {
           isError: true,
           content: [{
             type: "text",
-            text: `Error checking account balance: ${error instanceof Error ? error.message : 'Unknown error'}`
+            text: "❌ API credentials are invalid or the API is unreachable.\n\n" +
+                  "Error: " + (error instanceof Error ? error.message : String(error))
           }]
         };
       }
