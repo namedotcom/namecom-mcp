@@ -2,8 +2,7 @@
 jest.mock('../src/openapi-utils.js', () => ({
   loadOpenApiSpec: jest.fn(),
   openApiSchemaToZod: jest.fn(),
-  resolveSchemaRef: jest.fn(),
-  getSchemaExample: jest.fn()
+  resolveSchemaRef: jest.fn()
 }));
 
 jest.mock('../src/api-client.js', () => ({
@@ -16,7 +15,7 @@ jest.mock('../src/config.js', () => ({
   NAME_API_URL: 'https://mcp.dev.name.com'
 }));
 
-import { createToolsFromSpec, createFallbackTools } from '../src/tool-generator.js';
+import { createToolsFromSpec, createFallbackTools, flattenObjectProperties } from '../src/tool-generator.js';
 import { loadOpenApiSpec, openApiSchemaToZod, resolveSchemaRef } from '../src/openapi-utils.js';
 import { callNameApi } from '../src/api-client.js';
 import { z } from 'zod';
@@ -28,9 +27,7 @@ const mockCallNameApi = callNameApi as jest.MockedFunction<typeof callNameApi>;
 
 // Mock MCP Server
 const mockServer = {
-  tool: jest.fn(),
-  listTools: jest.fn(),
-  callTool: jest.fn()
+  tool: jest.fn()
 };
 
 describe('Tool Generator', () => {
@@ -584,35 +581,185 @@ describe('Tool Generator', () => {
   });
 
   describe('createFallbackTools', () => {
-    it('should create fallback Hello tool when OpenAPI spec is not available', () => {
+    it('should create error guidance tools when OpenAPI spec is not available', () => {
       createFallbackTools(mockServer as any);
 
+      // Should create both tools
       expect(mockServer.tool).toHaveBeenCalledWith(
-        'Hello',
+        'GetSetupHelp',
+        {},
+        expect.any(Function)
+      );
+      expect(mockServer.tool).toHaveBeenCalledWith(
+        'CheckConfiguration',
         {},
         expect.any(Function)
       );
     });
 
-    it('should execute fallback tool function', async () => {
+    it('should provide setup help content', async () => {
       createFallbackTools(mockServer as any);
 
-      // Get the Hello tool
-      const helloCall = mockServer.tool.mock.calls.find(
-        call => call[0] === 'Hello'
+      // Get the GetSetupHelp tool
+      const helpCall = mockServer.tool.mock.calls.find(
+        call => call[0] === 'GetSetupHelp'
       );
-      const helloFunction = helloCall[2];
+      const helpFunction = helpCall[2];
 
-      const result = await helloFunction({});
+      const result = await helpFunction({});
 
-      // New Hello tool doesn't call API, just returns static content
-      expect(mockCallNameApi).not.toHaveBeenCalled();
-      expect(result).toEqual({
-        content: [{
-          type: "text",
-          text: "Hello from the name.com MCP Server! 🌐\n\nThis server provides AI assistants with access to name.com's domain management API.\n\nAvailable operations include:\n• Domain registration and management\n• DNS record management\n• Email forwarding setup\n• URL forwarding configuration\n• Account information retrieval\n\nTo get started, try asking about domain availability or listing your domains."
-        }]
-      });
+      // Verify content includes key elements
+      expect(result.content[0].text).toContain('⚠️ The name.com MCP server is not configured correctly');
+      expect(result.content[0].text).toContain('NAME_USERNAME');
+      expect(result.content[0].text).toContain('NAME_TOKEN');
+      expect(result.content[0].text).toContain('https://docs.name.com');
+      expect(result.content[0].text).toContain('https://www.name.com/support');
     });
+
+    it('should handle successful API check but failed spec load', async () => {
+      mockCallNameApi.mockResolvedValueOnce({ status: 'ok' });
+      createFallbackTools(mockServer as any);
+
+      const checkCall = mockServer.tool.mock.calls.find(
+        call => call[0] === 'CheckConfiguration'
+      );
+      const checkFunction = checkCall[2];
+
+      const result = await checkFunction({});
+
+      expect(result.content[0].text).toContain('✅ API credentials are valid');
+      expect(result.content[0].text).toContain('OpenAPI spec failed to load');
+      expect(result.isError).toBeUndefined();
+    });
+
+    it('should handle failed API check', async () => {
+      mockCallNameApi.mockRejectedValueOnce(new Error('Invalid credentials'));
+      createFallbackTools(mockServer as any);
+
+      const checkCall = mockServer.tool.mock.calls.find(
+        call => call[0] === 'CheckConfiguration'
+      );
+      const checkFunction = checkCall[2];
+
+      const result = await checkFunction({});
+
+      expect(result.content[0].text).toContain('❌ API credentials are invalid');
+      expect(result.content[0].text).toContain('Error: Invalid credentials');
+      expect(result.isError).toBe(true);
+    });
+  });
+});
+
+describe('Parameter Description Generation', () => {
+  it('should include nullable status in parameter description', async () => {
+    const mockSchema = {
+      type: 'string',
+      description: 'A test parameter',
+      nullable: true
+    };
+    
+    const params: Record<string, z.ZodTypeAny> = {};
+    
+    flattenObjectProperties(
+      { properties: { testParam: mockSchema } },
+      params,
+      '',
+      [],
+      {},
+      {}
+    );
+    
+    expect(params.testParam.description).toContain('null values allowed');
+  });
+
+  it('should include validation combinations in description', async () => {
+    const mockSchema = {
+      type: 'string',
+      description: 'A test parameter',
+      allOf: [{ type: 'string' }],
+      oneOf: [{ type: 'string' }],
+      anyOf: [{ type: 'string' }]
+    };
+    
+    const params: Record<string, z.ZodTypeAny> = {};
+    
+    flattenObjectProperties(
+      { properties: { testParam: mockSchema } },
+      params,
+      '',
+      [],
+      {},
+      {}
+    );
+    
+    expect(params.testParam.description).toContain('must satisfy all conditions');
+    expect(params.testParam.description).toContain('must satisfy exactly one condition');
+    expect(params.testParam.description).toContain('must satisfy at least one condition');
+  });
+
+  it('should use title over description when available', async () => {
+    const mockSchema = {
+      type: 'string',
+      title: 'Test Title',
+      description: 'Test Description'
+    };
+    
+    const params: Record<string, z.ZodTypeAny> = {};
+    
+    flattenObjectProperties(
+      { properties: { testParam: mockSchema } },
+      params,
+      '',
+      [],
+      {},
+      {}
+    );
+    
+    expect(params.testParam.description).toContain('Test Title');
+  });
+
+  it('should handle purchasePrice parameter correctly', async () => {
+    const mockSchema = {
+      type: 'number',
+      description: 'Purchase price for domain'
+    };
+    
+    const params: Record<string, z.ZodTypeAny> = {};
+    
+    flattenObjectProperties(
+      { properties: { purchasePrice: mockSchema } },
+      params,
+      '',
+      [],
+      {},
+      {}
+    );
+    
+    const desc = params.purchasePrice.description;
+    expect(desc).toContain('premium: true');
+    expect(desc).toContain('premium: false');
+    expect(desc).toContain('ALWAYS OMIT');
+    expect(desc).toContain('auto-calculate');
+  });
+
+  it('should include default values from schema', async () => {
+    const mockSchema = {
+      type: 'string',
+      description: 'A test parameter',
+      default: 'default value'
+    };
+    
+    const params: Record<string, z.ZodTypeAny> = {};
+    
+    flattenObjectProperties(
+      { properties: { testParam: mockSchema } },
+      params,
+      '',
+      [],
+      {},
+      {}
+    );
+    
+    expect(params.testParam.description).toContain('defaults to: default value');
   });
 }); 

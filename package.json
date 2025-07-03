@@ -8,7 +8,9 @@
     "namecom-mcp": "dist/index.js"
   },
   "scripts": {
-    "build": "node scripts/embed-spec.cjs && tsc",
+    "clean": "rm -rf dist",
+    "prebuild": "npm run clean && node scripts/embed-spec.cjs && node scripts/embed-version.cjs",
+    "build": "tsc",
     "start": "node dist/index.js",
     "dev": "node --loader ts-node/esm src/index.ts",
     "test": "jest",

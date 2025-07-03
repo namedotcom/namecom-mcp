@@ -14,20 +14,26 @@ export interface FetchOptions {
 
 export interface OpenApiSchema {
   type?: string | string[];
-  enum?: string[];
+  format?: string;
+  description?: string;
+  items?: OpenApiSchema;
   properties?: Record<string, OpenApiSchema>;
   required?: string[];
-  items?: OpenApiSchema;
-  additionalProperties?: OpenApiSchema | boolean;
+  additionalProperties?: boolean | OpenApiSchema;
   $ref?: string;
-  title?: string;
-  description?: string;
-  format?: string;
+  enum?: string[];
+  pattern?: string;
   example?: any;
-  nullable?: boolean; // OpenAPI 3.0 style
+  minLength?: number;
+  maxLength?: number;
+  minimum?: number;
+  maximum?: number;
   allOf?: OpenApiSchema[];
   oneOf?: OpenApiSchema[];
   anyOf?: OpenApiSchema[];
+  nullable?: boolean;
+  title?: string;
+  default?: any;
 }
 
 export interface OpenApiParameter {
