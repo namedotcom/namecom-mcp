@@ -12,4 +12,3 @@ export const VERSION = '${version}';
 
 // Write to src directory
 fs.writeFileSync(path.join(__dirname, "../src/version.ts"), versionFileContent);
-console.log(`✓ Embedded version ${version} into src/version.ts`);
