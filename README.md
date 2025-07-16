@@ -294,6 +294,7 @@ If you run into issues:
 3. Verify your credentials work with name.com's API directly
 4. Check [GitHub Issues](https://github.com/namedotcom/namecom-mcp/issues) for known issues
 5. Report bugs or request features on [GitHub Issues](https://github.com/namedotcom/namecom-mcp/issues)
+6. General feedback: [name.com API Feedback](https://www.name.com/api-feedback)
 
 **For name.com account or API issues:**
 - [name.com Support](https://www.name.com/support) - Account and billing support
@@ -337,6 +338,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 - **Issues**: Report bugs and feature requests on [GitHub Issues](https://github.com/namedotcom/namecom-mcp/issues)
 - **Documentation**: See the [name.com API Documentation](https://docs.name.com) for API details
 - **MCP Protocol**: Learn more about [Model Context Protocol](https://modelcontextprotocol.io/)
+- **Feedback**: We want to hear from you! Submit feedback about the MCP server or name API in general [here](https://www.name.com/api-feedback)
 
 ## Changelog
 
