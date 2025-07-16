@@ -338,7 +338,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 - **Issues**: Report bugs and feature requests on [GitHub Issues](https://github.com/namedotcom/namecom-mcp/issues)
 - **Documentation**: See the [name.com API Documentation](https://docs.name.com) for API details
 - **MCP Protocol**: Learn more about [Model Context Protocol](https://modelcontextprotocol.io/)
-- **Feedback**: We want to hear from you! Submit feedback about the MCP server or name API in general [here](https://www.name.com/api-feedback)
+- **Feedback**: We want to hear from you! Submit feedback about the MCP server or name API [here](https://www.name.com/api-feedback)
 
 ## Changelog
 
