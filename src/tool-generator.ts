@@ -737,7 +737,13 @@ async function executeOperation(
     if (Object.keys(queryParams).length > 0) {
       const queryString = Object.entries(queryParams)
         .filter(([_, value]) => value !== undefined)
-        .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+        .map(([key, value]) => {
+          // Handle array parameters with bracket notation
+          if (Array.isArray(value)) {
+            return value.map(item => `${encodeURIComponent(key)}[]=${encodeURIComponent(String(item))}`).join('&');
+          }
+          return `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`;
+        })
         .join('&');
       
       if (queryString) {

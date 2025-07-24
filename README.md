@@ -20,52 +20,47 @@ This MCP server works with **any AI tool that supports the Model Context Protoco
 - 🤖 **AI-First Design**: Built specifically for natural language interaction via MCP
 - 🆘 **Built-in Help**: Ask your AI assistant for help, troubleshooting, and documentation links
 
-## Installation & Configuration
+## Quick Start
 
 ### Prerequisites
 
-- **Node.js** 17+ and **npm** ([download here](https://nodejs.org/))
+- **An AI Tool** that supports MCP:
+  - [Cursor](https://cursor.com/downloads)
+  - [Claude Desktop](https://claude.ai/download)
+  - Other MCP-compatible tools (check their documentation)
 - **name.com Account** with API credentials ([sign up free](https://www.name.com/) | [help getting credentials](#getting-namecom-api-credentials))
-- **MCP-Compatible AI Tool** (Cursor, Claude Desktop, etc.)
 
 ### Setup
 
-**Step 1: Install the package**
-```bash
-npm install -g namecom-mcp
-```
-
-**Step 2: Choose your configuration method**
-
-The `npm install` command installed the name.com MCP server on your computer. Now your AI tool needs to know where to find it and how to authenticate with name.com. Choose one of the following configuration methods:
-
-#### Method A: Direct Configuration (Recommended)
-
-This approach uses name.com's test environment by default. To get started, add the configuration below to your AI tool's MCP config file. Instructions for locating the MCP config files for a few common AI tools are provided after the configuration examples.
+Simply copy and paste this configuration into your AI tool's MCP config file. This uses name.com's test environment by default, which is perfect for trying things out safely.
 
 ```json
 {
   "mcpServers": {
     "namecom": {
-      "command": "namecom-mcp",
+      "command": "npx",
+      "args": ["-y", "namecom-mcp@latest"],
       "env": {
-        "NAME_USERNAME": "your-test-username",
-        "NAME_TOKEN": "your-test-token"
+        "NAME_USERNAME": "your-test-username",  // Replace with your test username
+        "NAME_TOKEN": "your-test-token"         // Replace with your test api token
       }
     }
   }
 }
 ```
 
-**For production environment** (advanced), add the API URL:
+**Important**: Replace `your-test-username` and `your-test-token` with your actual test environment credentials from name.com. Don't know where to get these? See [getting credentials](#getting-namecom-api-credentials).
+
+**For production environment** (advanced), just add the API URL:
 ```json
 {
   "mcpServers": {
     "namecom": {
-      "command": "namecom-mcp",
+      "command": "npx",
+      "args": ["-y", "namecom-mcp@latest"],
       "env": {
-        "NAME_USERNAME": "your-prod-username",
-        "NAME_TOKEN": "your-prod-token",
+        "NAME_USERNAME": "your-prod-username",  // Replace with your production username
+        "NAME_TOKEN": "your-prod-token",        // Replace with your production api token
         "NAME_API_URL": "https://mcp.name.com"
       }
     }
@@ -73,9 +68,9 @@ This approach uses name.com's test environment by default. To get started, add t
 }
 ```
 
-> ⚠️ **Production Warning**: This will affect your real name.com account and may incur charges. See [Environment Details](#environment-details) for credential requirements.
+**Important**: Replace `your-prod-username` and `your-prod-token` with your actual production credentials. These affect your real name.com account and can incur charges!
 
-**Important**: Use the right credentials for your environment - test credentials for test environment, production credentials for production.
+> ⚠️ **Production Warning**: This will affect your real name.com account and may incur charges. See [Environment Details](#environment-details) for credential requirements.
 
 **How to add this configuration to your tool:**
 
@@ -91,40 +86,12 @@ This approach uses name.com's test environment by default. To get started, add t
 **Other MCP-Compatible Tools:**
 This server is designed to work with any MCP-compatible tool. Check your tool's documentation for MCP configuration steps, as the exact process varies by tool.
 
-> 📖 **Note**: The steps above may change as tools update. Please check the official documentation for Claude Desktop and Cursor if these steps don't match, and report any outdated instructions.
-
-> 🔄 **Important**: Restart your AI tool after configuration changes if you experience connection issues.
-
-#### Method B: Environment File
-
-Use this method if:
-- Your tool doesn't support the direct configuration above
-- You prefer managing credentials in environment files
-- You're developing or testing the server
-
-Create a `.env` file in your working directory:
-```env
-# For test environment (default)
-NAME_USERNAME=your-test-username
-NAME_TOKEN=your-test-token
-
-# For production environment (advanced)
-# NAME_USERNAME=your-prod-username
-# NAME_TOKEN=your-prod-token
-# NAME_API_URL=https://mcp.name.com
-```
-
-**Important**: Make sure to use the correct credentials for your chosen environment - test credentials for test environment, production credentials for production environment.
-
-**Step 3: You're done! 🎉**
-
-Start your AI tool and begin asking domain-related questions. Your AI assistant will automatically use the name.com tools when needed.
-
 ### Understanding the Configuration
 
 **What each setting does:**
 - **`"namecom"`**: The name for this MCP server (you can change this)
-- **`"command": "namecom-mcp"`**: Tells your AI tool to run the package you installed
+- **`"command": "npx"`**: Uses npx to automatically download and run the latest version
+- **`"args": ["-y", "namecom-mcp@latest"]`**: Runs the latest version without prompts
 - **`"NAME_USERNAME"`**: Your name.com API username (test credentials recommended)
 - **`"NAME_TOKEN"`**: Your name.com API token (test credentials recommended)
 - **Optional**: Add `"NAME_API_URL": "https://mcp.name.com"` for production environment
@@ -267,24 +234,24 @@ The MCP Inspector is **excellent for testing and troubleshooting** your MCP serv
 
 3. **Tool Generation Fails**: The server will fall back to basic tools if OpenAPI spec loading fails
 
-4. **Package Not Found**: 
-   - Make sure you've installed the package: `npm install -g namecom-mcp`
-   - Try reinstalling if you encounter issues: `npm uninstall -g namecom-mcp && npm install -g namecom-mcp`
+4. **First Run Delay**: 
+   - The first run might take a few seconds as npx downloads the package
+   - Subsequent runs will be faster due to npm's cache
+   - If you see "Installing package..." messages, this is normal for the first run
 
 5. **MCP Configuration Issues**:
-   - Check your MCP config file path and JSON syntax (see Configuration section for file locations)
+   - Check your MCP config file path and JSON syntax
    - **Restart your AI tool** (like Claude Desktop) after configuration changes
-   - Verify the command is `namecom-mcp` (no npx needed)
+   - Make sure the `args` array includes both `-y` and the package name
 
 6. **MCP Inspector Connection Issues**:
-   - Make sure to include your credentials: `NAME_USERNAME=your-username NAME_TOKEN=your-token npx @modelcontextprotocol/inspector namecom-mcp`
-   - Check that your credentials are correct and match your configured environment (test vs production)
+   ```bash
+   # For test environment:
+   NAME_USERNAME=your-username NAME_TOKEN=your-token npx @modelcontextprotocol/inspector npx -y namecom-mcp@latest
 
-### npm Installation Issues
-
-For npm installation or permission issues, see the official documentation:
-- **[npm global package installation](https://docs.npmjs.com/resolving-eacces-permissions-errors-when-installing-packages-globally)**
-- **[Node Version Manager (nvm)](https://github.com/nvm-sh/nvm)** - recommended for avoiding permission issues
+   # For production:
+   NAME_USERNAME=your-username NAME_TOKEN=your-token NAME_API_URL=https://mcp.name.com npx @modelcontextprotocol/inspector npx -y namecom-mcp@latest
+   ```
 
 ### Getting Help
 
@@ -317,8 +284,17 @@ A: Usually mismatched credentials - test credentials work with test environment,
 **Q: How much does it cost?**
 A: The MCP server is free. You only pay for actual name.com services you use.
 
-**Q: Does it work offline?**
-A: No, it needs internet access to communicate with name.com's API.
+**Q: Will npx always download the package?**
+A: No, npm caches the package locally. Only the first run or when a new version is available will require a download.
+
+**Q: Do I need to install anything besides my AI tool?**
+A: No! Tools like Cursor and Claude Desktop include everything needed. Just install your preferred AI tool and you're ready to go.
+
+**Q: What if I see "command not found: npx" or similar errors?**
+A: This usually means your AI tool isn't properly installed. Try reinstalling your AI tool (Cursor, Claude Desktop, etc.) and make sure to let it complete its setup process.
+
+**Q: Why does the first run take longer?**
+A: The first run needs to download the package. Subsequent runs will be faster since the package is cached locally.
 
 ## MCP Ecosystem
 
