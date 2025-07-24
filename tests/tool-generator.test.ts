@@ -578,6 +578,57 @@ describe('Tool Generator', () => {
       const deprecatedCalls = mockServer.tool.mock.calls.filter((call: any) => call[0] === 'EnableAutorenew');
       expect(deprecatedCalls).toHaveLength(0);
     });
+
+    it('should handle array parameters with bracket notation', async () => {
+      const mockSpec = {
+        paths: {
+          '/core/v1/tldpricing': {
+            get: {
+              operationId: 'TldPriceList',
+              tags: ['Domains'],
+              parameters: [
+                {
+                  name: 'tlds',
+                  in: 'query',
+                  description: 'List of TLDs to get pricing for',
+                  schema: {
+                    type: 'array',
+                    items: { type: 'string' }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      };
+
+      mockLoadOpenApiSpec.mockResolvedValue(mockSpec);
+      mockOpenApiSchemaToZod.mockImplementation((schema) => {
+        if (schema?.type === 'array') {
+          return z.array(z.string()).optional();
+        }
+        return z.any();
+      });
+
+      await createToolsFromSpec(mockServer as any);
+
+      // Get the tool function
+      const toolCall = mockServer.tool.mock.calls.find(
+        (call: any[]) => call[0] === 'TldPriceList'
+      );
+      expect(toolCall).toBeDefined();
+      const toolFunction = toolCall[2];
+
+      // Call the tool with array parameter
+      await toolFunction({ tlds: ['com', 'org', 'net'] });
+
+      // Verify the API call used bracket notation
+      expect(mockCallNameApi).toHaveBeenCalledWith(
+        expect.stringMatching(/tlds\[\]=com&tlds\[\]=org&tlds\[\]=net/),
+        'GET',
+        null
+      );
+    });
   });
 
   describe('createFallbackTools', () => {

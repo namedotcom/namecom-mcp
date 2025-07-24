@@ -7,9 +7,9 @@ export const EMBEDDED_SPEC = {
             "email": "accountservices@name.com",
             "name": "Account Services"
         },
-        "description": "RESTful API for managing domains, DNS records, and related services at Name.com.  Access via HTTPS at api.name.com (production) or api.dev.name.com (testing).  Supports standard authentication, rate-limited to 20 requests/second. ",
-        "title": "Name.com Core API",
-        "version": "1.0.3",
+        "description": "RESTful API for managing domains, DNS records, and related services at name.com.  Access via HTTPS at api.name.com (production) or api.dev.name.com (testing).  Supports standard authentication, rate-limited to 20 requests/second. ",
+        "title": "name.com Core API",
+        "version": "1.2.1",
         "termsOfService": "https://www.name.com/policies/api-access-agreement"
     },
     "servers": [
@@ -30,7 +30,7 @@ export const EMBEDDED_SPEC = {
         },
         {
             "name": "Account Info",
-            "description": "Use Account Info endpoints to retrieve basic information about your Name.com account. For example, you can check your account’s current credit balance and other account details using these endpoints."
+            "description": "Use Account Info endpoints to retrieve basic information about your name.com account. For example, you can check your account’s current credit balance and other account details using these endpoints."
         },
         {
             "name": "Accounts",
@@ -62,7 +62,7 @@ export const EMBEDDED_SPEC = {
         },
         {
             "name": "Transfers",
-            "description": "Use Transfers endpoints to move domains into your Name.com account. Start by creating a transfer request, then monitor and manage the status of pending transfers. You can also cancel a transfer if needed."
+            "description": "Use Transfers endpoints to move domains into your name.com account. Start by creating a transfer request, then monitor and manage the status of pending transfers. You can also cancel a transfer if needed."
         },
         {
             "name": "Orders",
@@ -71,6 +71,14 @@ export const EMBEDDED_SPEC = {
         {
             "name": "Webhook Notifications",
             "description": "Use Webhook Notification endpoints to subscribe to real-time notifications for account and domain events. This keeps your application updated on important changes without polling the API."
+        },
+        {
+            "name": "Domain Info",
+            "description": "Use Domain Info endpoints to retrieve information about TLD-specific requirements and registration rules. These endpoints help you understand what fields, documents, or constraints are needed to successfully register domains across different TLDs."
+        },
+        {
+            "name": "TLD Pricing",
+            "description": "Use TLD Pricing endpoints to retrieve general pricing information for your account."
         }
     ],
     "paths": {
@@ -137,7 +145,7 @@ export const EMBEDDED_SPEC = {
         },
         "/core/v1/accounts": {
             "post": {
-                "description": "Creates a new sub-account under your authenticated reseller account and returns API credentials for the new account.  This endpoint is only available to approved reseller accounts. Contact Name.com support to request access.",
+                "description": "Creates a new sub-account under your authenticated reseller account and returns API credentials for the new account.  This endpoint is only available to approved reseller accounts. Contact name.com support to request access.",
                 "operationId": "CreateAccount",
                 "requestBody": {
                     "content": {
@@ -238,7 +246,8 @@ export const EMBEDDED_SPEC = {
                         "name": "perPage",
                         "schema": {
                             "format": "int32",
-                            "type": "integer"
+                            "type": "integer",
+                            "default": 1000
                         }
                     },
                     {
@@ -448,7 +457,7 @@ export const EMBEDDED_SPEC = {
                 ]
             },
             "post": {
-                "description": "Registers a new domain under your account. You must provide the `domain.domainName` at a bare minimum to register. \nFor premium or special-priced domains, the purchase_price must also be included to confirm cost. \nThis endpoint is commonly used to programmatically onboard new domains through user signup flows or checkout experiences.\n\nIf no contacts are passed in this request, the default contacts for your Name.com account will be used.\n\n### Best Practices For Domain Creates\n\nIn general, you should check that a domain is available prior to attempting to purchase a domain. \nYou can use either the [checkAvailability](#operation/CheckAvailability) endpoint, or the [Search](#operation/Search) endpoint\nto confirm that a domain is purchasable.\n\n#### Important Note on Dropcatching and Abuse Prevention\n\n_The createDomain endpoint is designed for standard domain registrations and is not intended for automated dropcatching (i.e., mass or high-frequency attempts to register domains the moment they become available after expiration). The use of drop-catching tools or services to acquire expired domains is strictly prohibited. All domain acquisitions must go through approved channels to ensure fair and transparent access._\n",
+                "description": "Registers a new domain under your account. You must provide the `domain.domainName` at a bare minimum to register. \nFor premium or special-priced domains, the purchase_price must also be included to confirm cost. \nThis endpoint is commonly used to programmatically onboard new domains through user signup flows or checkout experiences.\n\nIf no contacts are passed in this request, the default contacts for your name.com account will be used.\n\n### Best Practices For Domain Creates\n\nIn general, you should check that a domain is available prior to attempting to purchase a domain. \nYou can use either the [checkAvailability](#operation/CheckAvailability) endpoint, or the [Search](#operation/Search) endpoint\nto confirm that a domain is purchasable.\n\n#### Important Note on Dropcatching and Abuse Prevention\n\n_The createDomain endpoint is designed for standard domain registrations and is not intended for automated dropcatching (i.e., mass or high-frequency attempts to register domains the moment they become available after expiration). The use of drop-catching tools or services to acquire expired domains is strictly prohibited. All domain acquisitions must go through approved channels to ensure fair and transparent access._\n",
                 "operationId": "CreateDomain",
                 "requestBody": {
                     "content": {
@@ -1888,7 +1897,7 @@ export const EMBEDDED_SPEC = {
                         }
                     },
                     "403": {
-                        "description": "Name.com is not authoritative nameserver for request domain, or the request domain is expired.",
+                        "description": "The authoritative nameserver for the request domain is not name.com, or the request domain is expired.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2068,7 +2077,7 @@ export const EMBEDDED_SPEC = {
                         }
                     },
                     "403": {
-                        "description": "Name.com is not authoritative nameserver for request domain, or the request domain is expired.",
+                        "description": "The authoritative nameserver for the request domain is not name.com, or the request domain is expired.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4885,7 +4894,7 @@ export const EMBEDDED_SPEC = {
                 ]
             },
             "post": {
-                "description": "Creates a webhook subscription to receive real-time notifications about specific domain or account events (e.g. transfer completions, renewals).  Pass the callback URL and event types. This allows external systems to stay in sync with Name.com changes.",
+                "description": "Creates a webhook subscription to receive real-time notifications about specific domain or account events (e.g. transfer completions, renewals).  Pass the callback URL and event types. This allows external systems to stay in sync with name.com changes.",
                 "operationId": "SubscribeToNotification",
                 "requestBody": {
                     "content": {
@@ -5398,7 +5407,7 @@ export const EMBEDDED_SPEC = {
                 ]
             },
             "post": {
-                "description": "Initiates a domain transfer into your Name.com account from another registrar.  You must provide the domain name and its valid transfer authorization code (EPP code).  The domain must not be locked or under any transfer restrictions (e.g. clientTransferProhibited).  If successful, the transfer is submitted and tracked through the ICANN transfer process. Once a transfer has been created, you can track its progress via the [GetTransfer](#operation/GetTransfer) endpoint.",
+                "description": "Initiates a domain transfer into your name.com account from another registrar.  You must provide the domain name and its valid transfer authorization code (EPP code).  The domain must not be locked or under any transfer restrictions (e.g. clientTransferProhibited).  If successful, the transfer is submitted and tracked through the ICANN transfer process. Once a transfer has been created, you can track its progress via the [GetTransfer](#operation/GetTransfer) endpoint.",
                 "operationId": "CreateTransfer",
                 "requestBody": {
                     "content": {
@@ -5661,6 +5670,573 @@ export const EMBEDDED_SPEC = {
                     "Transfers"
                 ]
             }
+        },
+        "/core/v1/domaininfo/requirements/{tld}": {
+            "get": {
+                "description": "Returns the registration requirements some general information for a specific TLD. The response contains a detailed description of eligibility criteria and a fields object with all required and optional fields, including validation rules, conditional logic, and nested field structures. Provide the TLD as a path parameter to retrieve its complete registration requirements. Useful when you only need details for one TLD (e.g., when a user selects .fr from a dropdown).",
+                "operationId": "GetRequirement",
+                "parameters": [
+                    {
+                        "name": "tld",
+                        "description": "TLD indicates which domain requirements to retrieve (without the dot prefix, e.g., 'fr' for .fr domains).",
+                        "in": "path",
+                        "schema": {
+                            "type": "string",
+                            "example": "fr"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GetRequirementResponse"
+                                },
+                                "examples": {
+                                    "complex_requirement_set": {
+                                        "summary": "Complex requirement set",
+                                        "description": "Example of a complex requirement set with multiple fields, conditional logic, and nested requirements",
+                                        "value": {
+                                            "tldInfo": {
+                                                "tld": "fr",
+                                                "ccTld": true,
+                                                "supportsTransferLock": true,
+                                                "supportsDnssec": true,
+                                                "supportsPremium": true,
+                                                "expirationGracePeriod": 3,
+                                                "idnLanguages": {},
+                                                "allowedRegistrationYears": [
+                                                    1,
+                                                    2,
+                                                    3,
+                                                    4,
+                                                    5,
+                                                    6,
+                                                    7,
+                                                    8,
+                                                    9,
+                                                    10
+                                                ]
+                                            },
+                                            "requirements": {
+                                                "description": "Registration requirements for .fr domains",
+                                                "fields": {
+                                                    "firstName": {
+                                                        "description": "First name of registrant",
+                                                        "type": "string",
+                                                        "required": true
+                                                    },
+                                                    "lastName": {
+                                                        "description": "Last name of registrant",
+                                                        "type": "string",
+                                                        "required": true
+                                                    },
+                                                    "address1": {
+                                                        "description": "First part of mailing address",
+                                                        "type": "string",
+                                                        "required": true
+                                                    },
+                                                    "address2": {
+                                                        "description": "Second part of mailing address",
+                                                        "type": "string",
+                                                        "required": false
+                                                    },
+                                                    "companyName": {
+                                                        "description": "Company name of registrant",
+                                                        "type": "string",
+                                                        "required": false
+                                                    },
+                                                    "phone": {
+                                                        "description": "Phone number of registrant",
+                                                        "type": "string",
+                                                        "required": true
+                                                    },
+                                                    "fax": {
+                                                        "description": "Fax number of registrant",
+                                                        "type": "string",
+                                                        "required": false
+                                                    },
+                                                    "email": {
+                                                        "description": "Email address of registrant",
+                                                        "type": "string",
+                                                        "required": true,
+                                                        "validation": "valid_email"
+                                                    },
+                                                    "city": {
+                                                        "description": "City of registrant",
+                                                        "type": "string",
+                                                        "required": true
+                                                    },
+                                                    "state": {
+                                                        "description": "State/Province of registrant",
+                                                        "type": "string",
+                                                        "required": true
+                                                    },
+                                                    "zip": {
+                                                        "description": "Postal code of registrant",
+                                                        "type": "string",
+                                                        "required": true
+                                                    },
+                                                    "country": {
+                                                        "description": "Country of registrant, only options in this list are allowed",
+                                                        "type": "enum",
+                                                        "required": true,
+                                                        "options": [
+                                                            {
+                                                                "value": "AT",
+                                                                "label": "Austria"
+                                                            },
+                                                            {
+                                                                "value": "AX",
+                                                                "label": "Åland Islands"
+                                                            },
+                                                            {
+                                                                "value": "BE",
+                                                                "label": "Belgium"
+                                                            },
+                                                            {
+                                                                "value": "BG",
+                                                                "label": "Bulgaria"
+                                                            },
+                                                            {
+                                                                "value": "CH",
+                                                                "label": "Switzerland"
+                                                            },
+                                                            {
+                                                                "value": "CY",
+                                                                "label": "Cyprus"
+                                                            },
+                                                            {
+                                                                "value": "CZ",
+                                                                "label": "Czech Republic"
+                                                            },
+                                                            {
+                                                                "value": "DE",
+                                                                "label": "Germany"
+                                                            },
+                                                            {
+                                                                "value": "DK",
+                                                                "label": "Denmark"
+                                                            },
+                                                            {
+                                                                "value": "EE",
+                                                                "label": "Estonia"
+                                                            },
+                                                            {
+                                                                "value": "ES",
+                                                                "label": "Spain"
+                                                            },
+                                                            {
+                                                                "value": "FI",
+                                                                "label": "Finland"
+                                                            },
+                                                            {
+                                                                "value": "FR",
+                                                                "label": "France"
+                                                            },
+                                                            {
+                                                                "value": "GF",
+                                                                "label": "Guiana"
+                                                            },
+                                                            {
+                                                                "value": "GP",
+                                                                "label": "Guadeloupe"
+                                                            },
+                                                            {
+                                                                "value": "GR",
+                                                                "label": "Greece"
+                                                            },
+                                                            {
+                                                                "value": "HU",
+                                                                "label": "Hungary"
+                                                            },
+                                                            {
+                                                                "value": "IE",
+                                                                "label": "Ireland"
+                                                            },
+                                                            {
+                                                                "value": "IS",
+                                                                "label": "Iceland"
+                                                            },
+                                                            {
+                                                                "value": "IT",
+                                                                "label": "Italy"
+                                                            },
+                                                            {
+                                                                "value": "LI",
+                                                                "label": "Liechtenstein"
+                                                            },
+                                                            {
+                                                                "value": "LT",
+                                                                "label": "Lithuania"
+                                                            },
+                                                            {
+                                                                "value": "LU",
+                                                                "label": "Luxembourg"
+                                                            },
+                                                            {
+                                                                "value": "LV",
+                                                                "label": "Latvia"
+                                                            },
+                                                            {
+                                                                "value": "MQ",
+                                                                "label": "Martinique"
+                                                            },
+                                                            {
+                                                                "value": "MT",
+                                                                "label": "Malta"
+                                                            },
+                                                            {
+                                                                "value": "NC",
+                                                                "label": "New Caledonia"
+                                                            },
+                                                            {
+                                                                "value": "NL",
+                                                                "label": "Netherlands"
+                                                            },
+                                                            {
+                                                                "value": "NO",
+                                                                "label": "Norway"
+                                                            },
+                                                            {
+                                                                "value": "PF",
+                                                                "label": "Polynesia (French)"
+                                                            },
+                                                            {
+                                                                "value": "PL",
+                                                                "label": "Poland"
+                                                            },
+                                                            {
+                                                                "value": "PM",
+                                                                "label": "St. Pierre & Miquelon"
+                                                            },
+                                                            {
+                                                                "value": "PT",
+                                                                "label": "Portugal"
+                                                            },
+                                                            {
+                                                                "value": "RE",
+                                                                "label": "Reunion"
+                                                            },
+                                                            {
+                                                                "value": "RO",
+                                                                "label": "Romania"
+                                                            },
+                                                            {
+                                                                "value": "SE",
+                                                                "label": "Sweden"
+                                                            },
+                                                            {
+                                                                "value": "SI",
+                                                                "label": "Slovenia"
+                                                            },
+                                                            {
+                                                                "value": "SK",
+                                                                "label": "Slovakia"
+                                                            },
+                                                            {
+                                                                "value": "TF",
+                                                                "label": "French Southern and Antarctic Lands"
+                                                            },
+                                                            {
+                                                                "value": "WF",
+                                                                "label": "Wallis & Futuna Is."
+                                                            },
+                                                            {
+                                                                "value": "YT",
+                                                                "label": "Mayotte"
+                                                            }
+                                                        ]
+                                                    },
+                                                    "business": {
+                                                        "description": "",
+                                                        "type": "enum",
+                                                        "required": true,
+                                                        "label": "business",
+                                                        "options": [
+                                                            {
+                                                                "value": "no",
+                                                                "label": "I am an individual",
+                                                                "fields": {
+                                                                    "X-FR-BIRTHDATE": {
+                                                                        "description": "",
+                                                                        "type": "string",
+                                                                        "required": false,
+                                                                        "label": "Date of Birth (YYYY-MM-DD)"
+                                                                    },
+                                                                    "X-FR-BIRTHPLACE": {
+                                                                        "description": "",
+                                                                        "type": "string",
+                                                                        "required": true,
+                                                                        "label": "Birth Country (2 Letter Code)",
+                                                                        "fields": {
+                                                                            "X-FR-BIRTHCITY": {
+                                                                                "description": "",
+                                                                                "type": "string",
+                                                                                "required": false,
+                                                                                "label": "Birth City",
+                                                                                "required_when": "FR"
+                                                                            },
+                                                                            "X-FR-BIRTHPC": {
+                                                                                "description": "",
+                                                                                "type": "string",
+                                                                                "required": false,
+                                                                                "label": "Birth Postal Code",
+                                                                                "required_when": "FR"
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            },
+                                                            {
+                                                                "value": "yes",
+                                                                "label": "I am an organization",
+                                                                "fields": {
+                                                                    "X-FR-LOCAL": {
+                                                                        "description": "Local company registration #, or tax ID",
+                                                                        "type": "string",
+                                                                        "required": false,
+                                                                        "label": "Local company registration #, or tax ID"
+                                                                    }
+                                                                }
+                                                            }
+                                                        ]
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "simple_acknowledgement_requirement": {
+                                        "summary": "Simple acknowledgement requirement",
+                                        "description": "Example of a simple requirement with just an acknowledgement field",
+                                        "value": {
+                                            "tldInfo": {
+                                                "tld": "security",
+                                                "ccTld": false,
+                                                "supportsTransferLock": true,
+                                                "supportsDnssec": true,
+                                                "supportsPremium": true,
+                                                "expirationGracePeriod": 25,
+                                                "idnLanguages": {
+                                                    "AR": "Arabic",
+                                                    "GREK": "Greek",
+                                                    "HE": "Hebrew",
+                                                    "JA": "Japanese",
+                                                    "KO": "Korean",
+                                                    "LATN": "Latin",
+                                                    "LO": "Lao",
+                                                    "RU": "Russian",
+                                                    "TH": "Thai",
+                                                    "ZH": "Chinese"
+                                                },
+                                                "allowedRegistrationYears": [
+                                                    1,
+                                                    2,
+                                                    3,
+                                                    4,
+                                                    5,
+                                                    6,
+                                                    7,
+                                                    8,
+                                                    9,
+                                                    10
+                                                ]
+                                            },
+                                            "requirements": {
+                                                "description": "Registration requirements for .security domains",
+                                                "fields": {
+                                                    "acknowledgement": {
+                                                        "description": ".SECURITY domains will not resolve unless they have both DNSSEC and an SSL on the domain.",
+                                                        "type": "acknowledgement",
+                                                        "required": false,
+                                                        "label": "I understand",
+                                                        "value": "accepted"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "simple_notification_requirement": {
+                                        "summary": "Simple notification requirement",
+                                        "description": "Example of a simple requirement with just a notice field",
+                                        "value": {
+                                            "tldInfo": {
+                                                "tld": "at",
+                                                "ccTld": true,
+                                                "supportsTransferLock": false,
+                                                "supportsDnssec": true,
+                                                "supportsPremium": false,
+                                                "expirationGracePeriod": 3,
+                                                "idnLanguages": {},
+                                                "allowedRegistrationYears": [
+                                                    1,
+                                                    2,
+                                                    3,
+                                                    4,
+                                                    5,
+                                                    6,
+                                                    7,
+                                                    8,
+                                                    9,
+                                                    10
+                                                ]
+                                            },
+                                            "requirements": {
+                                                "description": "Registration requirements for .at domains",
+                                                "fields": {
+                                                    "description": {
+                                                        "description": "The .AT registry has special rules regarding the expiration and deletion of .AT domains. Customers who may choose not to renew .AT domains at their expiration should take note of these requirements. If you do not intend to renew your .AT domain when it comes up for renewal, you will need to complete the official NIC.AT cancellation form at least 28 days before it's expiration date and return it directly to the .AT registry. If an official cancellation form is not received by the .AT registry 28 days prior to the domain's expiration date, name.com will be required to withdraw the registration, which will result in NIC.AT billing you directly for the subsequent registration period at the NIC.AT standard rate.",
+                                                        "type": "notice",
+                                                        "required": false,
+                                                        "label": ""
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": "The complete registration requirements for the specified TLD."
+                    },
+                    "404": {
+                        "description": "Tld not found.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFound404"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit has been exceeded.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TooManyRequests429"
+                                }
+                            }
+                        },
+                        "headers": {
+                            "x-ratelimit-reset": {
+                                "description": "Unix timestamp for the time at which the current rate limit will reset.",
+                                "schema": {
+                                    "type": "number",
+                                    "example": 1747668270
+                                }
+                            }
+                        }
+                    }
+                },
+                "summary": "Get Specific TLD Requirements",
+                "tags": [
+                    "Domain Info"
+                ]
+            }
+        },
+        "/core/v1/tldpricing": {
+            "get": {
+                "description": "Get an alphabetical pricing list of all TLDs supported by name.com. The pricing returned will be your account level price in US Dollars (USD) and is the price you pay for non-premium registrations.\n\n**Please Note:** This is general pricing for domains registered with the specified TLD. Individual domains may have different pricing based on a large number of factors.\nIf you are trying to see pricing for a specific individual domain, you will need to use the [Get Pricing For Domain API](#tag/Domains/operation/GetPricingForDomain).\n\nPlease note that if `null` is returned for any of the prices, it means that particular product is unavailable at name.com at the time of the request.\nFor example, if `registrationPrice` returns as `null` in the response, it means that name.com is not currently accepting registrations for that TLD.\n\nAny IDN TLDs will return in their unicode format.\n",
+                "operationId": "TldPriceList",
+                "parameters": [
+                    {
+                        "description": "Per Page is the number of records to return per request. Per Page defaults to 25.",
+                        "in": "query",
+                        "name": "perPage",
+                        "schema": {
+                            "format": "int32",
+                            "type": "integer",
+                            "default": 25
+                        }
+                    },
+                    {
+                        "description": "Page is which page to return.",
+                        "in": "query",
+                        "name": "page",
+                        "schema": {
+                            "format": "int32",
+                            "type": "integer",
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "duration",
+                        "description": "The number of years to get pricing for. The requested duration must be between 1 and 10 (inclusive). If the duration is not passed in the request, it will default to 1.",
+                        "required": false,
+                        "in": "query",
+                        "schema": {
+                            "type": "number",
+                            "format": "int32",
+                            "minimum": 1,
+                            "maximum": 10,
+                            "example": 1,
+                            "default": 5
+                        }
+                    },
+                    {
+                        "name": "tlds",
+                        "description": "A list of specific TLDs to get pricing for. Maximum of 25 TLDs can be requested at a time. When querying for IDN TLDs, due to character restrictions within a URL, they must be submitted in ASCII format. This means using \"xn--9dbq2a\" as opposed to it's unicode equivalent.",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 25,
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "A successful response.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TldPriceListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit has been exceeded.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TooManyRequests429"
+                                }
+                            }
+                        },
+                        "headers": {
+                            "x-ratelimit-reset": {
+                                "description": "Unix timestamp for the time at which the current rate limit will reset.",
+                                "schema": {
+                                    "type": "number",
+                                    "example": 1747668270
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GenericError500"
+                                }
+                            }
+                        }
+                    }
+                },
+                "summary": "TLD Price List",
+                "tags": [
+                    "TLD Pricing"
+                ]
+            }
         }
     },
     "webhooks": {
@@ -5733,7 +6309,7 @@ export const EMBEDDED_SPEC = {
             "BasicAuth": {
                 "scheme": "basic",
                 "type": "http",
-                "description": "Authentication for the Name.com Core API uses HTTP Basic Authentication. Provide your username and API token (not your account password) as the credentials. For the testing environment (api.dev.name.com), append \"-test\" to your username and use your test API token found in your API Token Management page.\nNote that Two-Step Verification is not compatible with API access. Rate limits of 20 requests per second or 3000 requests per hour apply. All requests must be made over HTTPS (port 443).\nFailure to authenticate properly will result in 401 Unauthenticated or 403 Permission Denied responses with appropriate error messages."
+                "description": "Authentication for the name.com API (Core) uses HTTP Basic Authentication. Provide your username and API token (not your account password) as the credentials. For the testing environment (api.dev.name.com), append \"-test\" to your username and use your test API token found in your API Token Management page.\nNote that Two-Step Verification is not compatible with API access. Rate limits of 20 requests per second or 3000 requests per hour apply. All requests must be made over HTTPS (port 443).\nFailure to authenticate properly will result in 401 Unauthenticated or 403 Permission Denied responses with appropriate error messages."
             }
         },
         "schemas": {
@@ -5747,7 +6323,10 @@ export const EMBEDDED_SPEC = {
                     }
                 },
                 "title": "CheckAccountBalanceResponse is the current account balance for the authenticated user",
-                "type": "object"
+                "type": "object",
+                "required": [
+                    "balance"
+                ]
             },
             "Unauthorized401": {
                 "type": "object",
@@ -6210,7 +6789,8 @@ export const EMBEDDED_SPEC = {
                 "required": [
                     "to",
                     "from",
-                    "totalCount"
+                    "totalCount",
+                    "domains"
                 ]
             },
             "DomainCreatePayload": {
@@ -6256,7 +6836,10 @@ export const EMBEDDED_SPEC = {
                         "example": 1
                     }
                 },
-                "type": "object"
+                "type": "object",
+                "required": [
+                    "domain"
+                ]
             },
             "CreateDomainResponse": {
                 "description": "CreateDomainResponse contains the domain info as well as the order info for the created domain.",
@@ -6278,7 +6861,8 @@ export const EMBEDDED_SPEC = {
                 "type": "object",
                 "required": [
                     "order",
-                    "totalPaid"
+                    "totalPaid",
+                    "domain"
                 ]
             },
             "PaymentRequired402": {
@@ -6573,7 +7157,7 @@ export const EMBEDDED_SPEC = {
                         "type": "integer"
                     },
                     "ttl": {
-                        "description": "TTL is the time this record can be cached for in seconds. Name.com allows a minimum TTL of 300, or 5 minutes.",
+                        "description": "TTL is the time this record can be cached for in seconds. name.com allows a minimum TTL of 300, or 5 minutes.",
                         "format": "int64",
                         "type": "integer"
                     },
@@ -6662,7 +7246,7 @@ export const EMBEDDED_SPEC = {
                         "type": "integer"
                     },
                     "ttl": {
-                        "description": "TTL is the time this record can be cached for in seconds. Name.com allows a minimum TTL of 300, or 5 minutes.",
+                        "description": "TTL is the time this record can be cached for in seconds. name.com allows a minimum TTL of 300, or 5 minutes.",
                         "format": "int64",
                         "type": "integer"
                     },
@@ -6710,7 +7294,7 @@ export const EMBEDDED_SPEC = {
                         "type": "integer"
                     },
                     "ttl": {
-                        "description": "TTL is the time this record can be cached for in seconds. Name.com allows a minimum TTL of 300, or 5 minutes.",
+                        "description": "TTL is the time this record can be cached for in seconds. name.com allows a minimum TTL of 300, or 5 minutes.",
                         "format": "int64",
                         "type": "integer"
                     },
@@ -6858,42 +7442,22 @@ export const EMBEDDED_SPEC = {
             },
             "UpdateURLForwardingBody": {
                 "description": "The request body for updating an existing URL forwarding entry.",
-                "type": "object",
                 "allOf": [
                     {
                         "$ref": "#/components/schemas/URLForwarding"
+                    },
+                    {
+                        "type": "object",
+                        "properties": {
+                            "host": {
+                                "readOnly": true
+                            },
+                            "domainName": {
+                                "readOnly": true
+                            }
+                        }
                     }
-                ],
-                "oneOf": [
-                    {
-                        "required": [
-                            "forwardsTo"
-                        ]
-                    },
-                    {
-                        "required": [
-                            "type"
-                        ]
-                    },
-                    {
-                        "required": [
-                            "meta"
-                        ]
-                    },
-                    {
-                        "required": [
-                            "title"
-                        ]
-                    }
-                ],
-                "properties": {
-                    "host": {
-                        "readOnly": true
-                    },
-                    "domainName": {
-                        "readOnly": true
-                    }
-                }
+                ]
             },
             "VanityNameserver": {
                 "description": "VanityNameserver represents a custom nameserver associated with a domain, including its hostname and a list of IP addresses for glue records.",
@@ -7092,7 +7656,8 @@ export const EMBEDDED_SPEC = {
                     "years": {
                         "description": "Years is the number of years you wish to purchase Whois Privacy for. Years defaults to 1 and cannot be more then the domain expiration date.",
                         "format": "int32",
-                        "type": "integer"
+                        "type": "integer",
+                        "default": 1
                     }
                 },
                 "type": "object"
@@ -7343,7 +7908,13 @@ export const EMBEDDED_SPEC = {
                     }
                 },
                 "title": "HelloResponse is the response from the HelloFunc command",
-                "type": "object"
+                "type": "object",
+                "required": [
+                    "motd",
+                    "serverName",
+                    "serverTime",
+                    "username"
+                ]
             },
             "SubscriptionRecord": {
                 "properties": {
@@ -7521,7 +8092,18 @@ export const EMBEDDED_SPEC = {
                         "type": "string"
                     }
                 },
-                "type": "object"
+                "type": "object",
+                "required": [
+                    "duration",
+                    "id",
+                    "interval",
+                    "name",
+                    "originalPrice",
+                    "price",
+                    "quantity",
+                    "status",
+                    "type"
+                ]
             },
             "Order": {
                 "description": "Order contains all the data for an order.",
@@ -7634,11 +8216,11 @@ export const EMBEDDED_SPEC = {
                 ]
             },
             "Transfer": {
-                "description": "Transfer contains all relevant data for a domain transfer to Name.com.",
+                "description": "Transfer contains all relevant data for a domain transfer to name.com.",
                 "type": "object",
                 "properties": {
                     "domainName": {
-                        "description": "DomainName is the domain to be transfered to Name.com.",
+                        "description": "DomainName is the domain to be transfered to name.com.",
                         "type": "string",
                         "example": "example.com"
                     },
@@ -7713,7 +8295,7 @@ export const EMBEDDED_SPEC = {
                         "minLength": 1
                     },
                     "domainName": {
-                        "description": "DomainName is the domain you want to transfer to Name.com.",
+                        "description": "DomainName is the domain you want to transfer to name.com.",
                         "type": "string",
                         "example": "example.com",
                         "minLength": 1
@@ -7762,6 +8344,385 @@ export const EMBEDDED_SPEC = {
                     "transfer"
                 ]
             },
+            "ResellerTldInfo": {
+                "description": "General information about a TLD and it's various requirements. This is not a comprehensive list of all information related to a TLD.",
+                "type": "object",
+                "properties": {
+                    "tld": {
+                        "description": "The TLD this information relates to.",
+                        "type": "string",
+                        "example": ".fr"
+                    },
+                    "ccTld": {
+                        "description": "Whether the TLD is a Country Code TLD.",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "supportsTransferLock": {
+                        "description": "Whether the TLD supports implementing a Transfer Lock.",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "supportsDnssec": {
+                        "description": "Whether the TLD supports DNSSEC.",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "supportsPremium": {
+                        "description": "Whether there are premium domains for this TLD.",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "expirationGracePeriod": {
+                        "description": "The number of days you have to renew your domain after it has expired, but before it is removed from your account.",
+                        "type": "number",
+                        "format": "int32",
+                        "example": 25
+                    },
+                    "allowedRegistrationYears": {
+                        "description": "The years that a domain is allowed to be registered for.",
+                        "type": "array",
+                        "items": {
+                            "type": "number"
+                        },
+                        "example": [
+                            1,
+                            3,
+                            5,
+                            8,
+                            10
+                        ]
+                    },
+                    "idnLanguages": {
+                        "description": "The IND Languages that the TLD supports (if any).",
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "example": {
+                            "DE": "German",
+                            "DK": "Danish",
+                            "ES": "Spanish",
+                            "IT": "Italian",
+                            "JP": "Japanese"
+                        }
+                    }
+                },
+                "required": [
+                    "tld",
+                    "ccTld",
+                    "supportsTransferLock",
+                    "supportsDnssec",
+                    "supportsPremium",
+                    "expirationGracePeriod",
+                    "idnLanguages",
+                    "allowedRegistrationYears"
+                ]
+            },
+            "RequirementField": {
+                "description": "A field definition for TLD registration requirements, including validation rules, conditional logic, and nested field structures.",
+                "type": "object",
+                "required": [
+                    "type",
+                    "required"
+                ],
+                "properties": {
+                    "description": {
+                        "description": "A detailed description of what this field is for and any specific requirements or constraints.",
+                        "type": "string",
+                        "example": "First name of registrant"
+                    },
+                    "type": {
+                        "description": "The requirement type of this field. Each requirement type has different information.\n\nPossible values and their details:\n\n  - **`string`**: These are open string fields that cannot be submitted as empty. They will always have a label. A description is optional as the label may convey all of the required information the user would need to submit.\n      Note: Some string fields may have a required format (i.e. date format of YYYY/MM/DD). The format will be listed in the \"validation\" parameter if required.\n      Example TLDs: abogado, law, com.br (and more)\n\n  - **`notice`**: These field types will just have a description, and contain information that must be displayed to the user prior to registration. There is no data that will be required to be submitted, so all notice type fields will have a \"required\" value of `false`.\n      Example TLDs: at (notice only), ca (1 notice field)\n\n  - **`acknowledgement`**: These field types will have a description, label and value. The description must be displayed to the user, the label is the required label for the acknowledgement, and the value is what must be submitted.\n      Example TLDs: security, ngo, music (and more)\n\n  - **`enum`**: The field types have a list of predefined options that the user must choose from in order to submit. Only the values returned in the \"options\" array will be allowed, or the request will fail validation. Options MAY include dependent fields, as some registries required additional information depending on what was chosen for the \"parent\" option. All dependent fields will follow the same field patterns as the parent fields.\n      Options: These are the predefined options for the enum type fields. They will always have a label and a value. The value is what must be submitted. The options MAY include a description, but will mostly only have a label parameter.\n      Note: There may be a single option returned for an enum. This is because that is the ONLY OPTION ALLOWED by the registry.\n      Example TLDs with simple lists: ca, es (and more)\n      Example TLDs with dependent fields: fr, se, com.br\n\n  - **`boolean`**: Boolean fields for simple true/false acknowledgements or selections.\n      Example TLDs: security\n",
+                        "enum": [
+                            "string",
+                            "notice",
+                            "acknowledgement",
+                            "enum",
+                            "boolean"
+                        ],
+                        "example": "string"
+                    },
+                    "required": {
+                        "description": "Whether this field is mandatory for domain registration. If true, the field must be provided.",
+                        "oneOf": [
+                            {
+                                "type": "boolean",
+                                "example": true
+                            },
+                            {
+                                "type": "string",
+                                "example": "true"
+                            }
+                        ],
+                        "example": true
+                    },
+                    "label": {
+                        "description": "A user-friendly label for this field that can be used in UI forms.",
+                        "type": "string",
+                        "example": "First Name"
+                    },
+                    "validation": {
+                        "description": "Validation rule to apply to this field. Common validations include 'valid_email', 'valid_phone', etc.",
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "example": "valid_email"
+                    },
+                    "options": {
+                        "description": "For fields with predefined choices, this can be either an array of complex option objects, a simple array of string values, or null if no options are available.",
+                        "oneOf": [
+                            {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/RequirementFieldOption"
+                                },
+                                "minItems": 0
+                            },
+                            {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                },
+                                "minItems": 0,
+                                "example": [
+                                    "English",
+                                    "French"
+                                ]
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "required_when": {
+                        "description": "For conditional fields, specifies when this field becomes required (e.g., when a parent option has a specific value).",
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "example": "FR"
+                    },
+                    "fields": {
+                        "description": "For complex fields or when options are selected, contains nested field definitions that become relevant.",
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/RequirementField"
+                        }
+                    },
+                    "value": {
+                        "description": "For acknowledgement fields, this is the value that must be submitted when the user acknowledges the requirement.",
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "example": "accepted"
+                    }
+                }
+            },
+            "RequirementFieldOption": {
+                "description": "An option within a field that has predefined choices, including the option value, label, and any nested fields that become relevant when this option is selected.",
+                "type": "object",
+                "required": [
+                    "value"
+                ],
+                "properties": {
+                    "value": {
+                        "description": "The actual value of this option. This is what must be submitted when this option is selected.",
+                        "type": "string",
+                        "example": "no"
+                    },
+                    "label": {
+                        "description": "A user-friendly label for this option that can be displayed in UI forms.",
+                        "type": "string",
+                        "example": "I am an individual"
+                    },
+                    "fields": {
+                        "description": "When this option is selected, these nested fields become relevant and may be required. This allows for conditional field logic.",
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/RequirementField"
+                        },
+                        "example": {
+                            "X-FR-BIRTHDATE": {
+                                "description": "DOB in format yy/mm/dd",
+                                "type": "string",
+                                "required": true
+                            },
+                            "X-FR-BIRTHPLACE": {
+                                "required": true,
+                                "description": "Nation of Birth",
+                                "type": "enum",
+                                "options": [
+                                    "FR",
+                                    "GB",
+                                    "USA"
+                                ]
+                            }
+                        }
+                    }
+                }
+            },
+            "Requirement": {
+                "description": "Requirement defines the registration requirements for a specific TLD, including required fields, validation rules, and conditional logic.",
+                "type": "object",
+                "properties": {
+                    "description": {
+                        "description": "A detailed description of the registration requirements for this TLD, including eligibility criteria, restrictions, and important notes.",
+                        "type": "string",
+                        "example": "Required fields to register an .fr domain"
+                    },
+                    "fields": {
+                        "description": "An object containing all required and optional fields for domain registration, with their validation rules and conditional logic.",
+                        "type": "object",
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/RequirementField"
+                        }
+                    }
+                }
+            },
+            "GetRequirementResponse": {
+                "description": "GetRequirementResponse has TLD Info and registration requirements for the specified TLD. The requirements field will always be present but may be an empty object when no specific requirements exist for the TLD.",
+                "type": "object",
+                "properties": {
+                    "tldInfo": {
+                        "description": "General information about a specific TLD. These are not registration requirements, but contain useful information for domain reseller and domain registrants in general.",
+                        "$ref": "#/components/schemas/ResellerTldInfo"
+                    },
+                    "requirements": {
+                        "description": "The registration requirements for this TLD, including required fields, validation rules, and conditional logic. This field will always be present but may be an empty object when no specific requirements exist for the TLD.",
+                        "$ref": "#/components/schemas/Requirement"
+                    }
+                },
+                "required": [
+                    "requirements",
+                    "tldInfo"
+                ]
+            },
+            "TldPriceListEntry": {
+                "description": "The pricing for an individual TLD.\n\nPlease note that if `null` is returned for any of the prices, it means that particular product is unavailable at name.com.\n\nFor example, if `registrationPrice` returns as `null` in the response, it means that name.com is not currently accepting registrations for that TLD.\n",
+                "properties": {
+                    "tld": {
+                        "description": "The TLD the pricing applies to. For IDN TLDs, this will be the unicode representation of the TLD.",
+                        "type": "string",
+                        "example": "com"
+                    },
+                    "duration": {
+                        "description": "The number of years this pricing is for",
+                        "type": "number",
+                        "format": "int32",
+                        "example": 1
+                    },
+                    "registrationPrice": {
+                        "description": "This your account level price in US Dollars (USD) and is the price you pay for non-premium registrations. It includes applicable rebates, promotions and/or sales.",
+                        "type": [
+                            "number",
+                            "null"
+                        ],
+                        "format": "double",
+                        "example": 9.99
+                    },
+                    "registrationOriginalPrice": {
+                        "description": "Price in US Dollars (USD) before any rebates, promotions and/or sales when registering non-premium domains.",
+                        "type": [
+                            "number",
+                            "null"
+                        ],
+                        "format": "double",
+                        "example": 11.99
+                    },
+                    "renewalPrice": {
+                        "description": "This your account level price in US Dollars (USD) and is the price you pay for renewals. It includes applicable rebates, promotions and/or sales.",
+                        "type": [
+                            "number",
+                            "null"
+                        ],
+                        "format": "double",
+                        "example": 9.99
+                    },
+                    "domainRestorationPrice": {
+                        "description": "This your account level price in US Dollars (USD) and is the price you pay for domain restorations. It includes applicable rebates, promotions and/or sales.",
+                        "type": [
+                            "number",
+                            "null"
+                        ],
+                        "format": "double",
+                        "example": 120.99
+                    },
+                    "transferInPrice": {
+                        "description": "This your account level price in US Dollars (USD) and is the price you pay for transferring a domain to management at name.com. It includes applicable rebates, promotions and/or sales.",
+                        "type": [
+                            "number",
+                            "null"
+                        ],
+                        "format": "double",
+                        "example": 19.99
+                    }
+                },
+                "required": [
+                    "tld",
+                    "duration",
+                    "registrationPrice",
+                    "registrationOriginalPrice",
+                    "renewalPrice",
+                    "domainRestorationPrice",
+                    "transferInPrice"
+                ]
+            },
+            "TldPriceListResponse": {
+                "properties": {
+                    "lastPage": {
+                        "description": "LastPage is the identifier for the final page of results. It is only populated if there is another page of results after the current page.",
+                        "format": "int32",
+                        "type": "integer"
+                    },
+                    "nextPage": {
+                        "description": "NextPage is the identifier for the next page of results. It is only populated if there is another page of results after the current page.",
+                        "format": "int32",
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "totalCount": {
+                        "description": "TotalCount is total number of results.",
+                        "format": "int32",
+                        "type": "integer"
+                    },
+                    "from": {
+                        "description": "From specifies starting record number on current page.",
+                        "format": "int32",
+                        "type": "integer"
+                    },
+                    "to": {
+                        "description": "To specifies ending record number on current page.",
+                        "format": "int32",
+                        "type": "integer"
+                    },
+                    "pricing": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/TldPriceListEntry"
+                        }
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "lastPage",
+                    "nextPage",
+                    "totalCount",
+                    "from",
+                    "to",
+                    "pricing"
+                ]
+            },
             "DomainTransferStatusChange": {
                 "type": "object",
                 "properties": {
@@ -7775,7 +8736,7 @@ export const EMBEDDED_SPEC = {
                     },
                     "status": {
                         "type": "string",
-                        "description": "The updated status of the domain transfer"
+                        "description": "The updated status of the domain transfer. The transfer status will be one of the following values:\n- **canceled:** The transfer has been canceled by the user.\n- **canceled_pending_refund**: The transfer has been canceled by the user, and a refund for the price is being processed.\n- **completed**: The transfer has completed.\n- **failed**: The transfer has failed, and will not be retried.\n- **pending**: The transfer has been requested, and is pending.\n- **pending_insert**: The transfer has completed and the domain will soon be inserted into the account.\n- **pending_new_auth_code**: A new authcode is required to complete the transfer.\n- **pending_transfer**: The transfer has been requested, and is pending.\n- **pending_unlock**: The domain to be transferred is currently in a locked state at the losing registrar, and will begin processing once the lock has been removed.\n- **rejected**: The transfer has been rejected at the losing registrar and will not be retried.\n- **submitting_transfer**: The transfer has been initiated and will soon be submitted to the registry.\n"
                     }
                 },
                 "required": [
