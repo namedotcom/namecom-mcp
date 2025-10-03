@@ -9,7 +9,7 @@ export const EMBEDDED_SPEC = {
         },
         "description": "RESTful API for managing domains, DNS records, and related services at name.com.  Access via HTTPS at api.name.com (production) or api.dev.name.com (testing).  Supports standard authentication, rate-limited to 20 requests/second. ",
         "title": "name.com Core API",
-        "version": "1.2.1",
+        "version": "1.7.0",
         "termsOfService": "https://www.name.com/policies/api-access-agreement"
     },
     "servers": [
@@ -39,6 +39,10 @@ export const EMBEDDED_SPEC = {
         {
             "name": "Domains",
             "description": "Use Domains endpoints to search for domain availability, register new domains, and manage existing domains."
+        },
+        {
+            "name": "Contact Verification",
+            "description": "Use Contact Verification endpoints to query a reseller’s unverified domains/emails and to programmatically mark an end user’s email as verified if the reseller has already completed the verification process. These endpoints help resellers meet ICANN requirements by ensuring end users confirm they can receive email at their listed address."
         },
         {
             "name": "DNS",
@@ -79,6 +83,10 @@ export const EMBEDDED_SPEC = {
         {
             "name": "TLD Pricing",
             "description": "Use TLD Pricing endpoints to retrieve general pricing information for your account."
+        },
+        {
+            "name": "Premium Domains",
+            "description": "APIs for working with Premium Domains."
         }
     ],
     "paths": {
@@ -457,8 +465,20 @@ export const EMBEDDED_SPEC = {
                 ]
             },
             "post": {
-                "description": "Registers a new domain under your account. You must provide the `domain.domainName` at a bare minimum to register. \nFor premium or special-priced domains, the purchase_price must also be included to confirm cost. \nThis endpoint is commonly used to programmatically onboard new domains through user signup flows or checkout experiences.\n\nIf no contacts are passed in this request, the default contacts for your name.com account will be used.\n\n### Best Practices For Domain Creates\n\nIn general, you should check that a domain is available prior to attempting to purchase a domain. \nYou can use either the [checkAvailability](#operation/CheckAvailability) endpoint, or the [Search](#operation/Search) endpoint\nto confirm that a domain is purchasable.\n\n#### Important Note on Dropcatching and Abuse Prevention\n\n_The createDomain endpoint is designed for standard domain registrations and is not intended for automated dropcatching (i.e., mass or high-frequency attempts to register domains the moment they become available after expiration). The use of drop-catching tools or services to acquire expired domains is strictly prohibited. All domain acquisitions must go through approved channels to ensure fair and transparent access._\n",
+                "description": "Registers a new domain under your account. You must provide the `domain.domainName` at a bare minimum to register. \nFor premium or special-priced domains, the purchase_price must also be included to confirm cost. \nThis endpoint is commonly used to programmatically onboard new domains through user signup flows or checkout experiences.\n\nIf no contacts are passed in this request, the default contacts for your name.com account will be used.\n\n### Best Practices For Domain Creates\n\nIn general, you should check that a domain is available prior to attempting to purchase a domain. \nYou can use either the [checkAvailability](#operation/CheckAvailability) endpoint, or the [Search](#operation/Search) endpoint\nto confirm that a domain is purchasable.\n\n#### Important Note on Dropcatching and Abuse Prevention\n\n_The createDomain endpoint is designed for standard domain registrations and is not intended for automated dropcatching (i.e., mass or high-frequency attempts to register domains the moment they become available after expiration). The use of drop-catching tools or services to acquire expired domains is strictly prohibited. All domain acquisitions must go through approved channels to ensure fair and transparent access._\n\n#### Contact Verification\nWhen a new domain registration is created and a contact is submitted, name.com may need to validate the contact's email address in accordance with ICANN policy. This validation involves sending an email to the provided address, prompting the recipient to click a link to verify their email address.\n",
                 "operationId": "CreateDomain",
+                "parameters": [
+                    {
+                        "name": "X-Idempotency-Key",
+                        "in": "header",
+                        "description": "A unique string (e.g., a UUID v4) to make the request idempotent. This key ensures that if the request is retried, the operation will not be performed multiple times. Subsequent requests with the same key will return the original result.",
+                        "schema": {
+                            "type": "string",
+                            "example": "083910ef-04e4-4bd1-a0bf-3737fe005ca8"
+                        },
+                        "required": false
+                    }
+                ],
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -531,6 +551,19 @@ export const EMBEDDED_SPEC = {
                                             }
                                         }
                                     }
+                                },
+                                "idnRegistration": {
+                                    "summary": "Registering an IDN domain",
+                                    "description": "How to pass the correct IDN language for domains using non-ASCII characters.",
+                                    "value": {
+                                        "domain": {
+                                            "domainName": "exámple.com"
+                                        },
+                                        "tldRequirements": {
+                                            "language": "ES"
+                                        },
+                                        "years": 1
+                                    }
                                 }
                             }
                         }
@@ -540,6 +573,22 @@ export const EMBEDDED_SPEC = {
                 },
                 "responses": {
                     "200": {
+                        "headers": {
+                            "X-Idempotency-Key": {
+                                "description": "If the initial request contained this header, echoes back with the initial value.",
+                                "schema": {
+                                    "type": "string",
+                                    "example": "083910ef-04e4-4bd1-a0bf-3737fe005ca8"
+                                }
+                            },
+                            "X-Idempotent-Replay": {
+                                "description": "Indicates that the response is being replayed from an idempotent request. This header will only be returned if the API is responding with cached data. Caches are cleared after 12 hours.",
+                                "schema": {
+                                    "type": "number",
+                                    "example": 1
+                                }
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -555,6 +604,22 @@ export const EMBEDDED_SPEC = {
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/InvalidArgument400"
+                                },
+                                "examples": {
+                                    "premiumPriceRequired": {
+                                        "summary": "Premium domain purchase requires price",
+                                        "value": {
+                                            "message": "Invalid argument",
+                                            "details": "Purchase price is required for premium domains in order to complete this request"
+                                        }
+                                    },
+                                    "priceRequired": {
+                                        "summary": "Purchase price required",
+                                        "value": {
+                                            "message": "Invalid argument",
+                                            "details": "Purchase price is required in order to complete this request"
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -589,12 +654,47 @@ export const EMBEDDED_SPEC = {
                             }
                         }
                     },
+                    "409": {
+                        "description": "When sending idempotent requests, this response indicates that there was an issue with the idempotency keys.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Idempotency key has been reused for a different request"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
                     "415": {
                         "description": "All POST, PUT, PATCH requests for this API must include the `Content-Type: application/json` header in the requests.",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/UnsupportedMedia415"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Pricing information unavailable.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnprocessableEntity422"
+                                },
+                                "examples": {
+                                    "registrationUnavailable": {
+                                        "summary": "Registration price unavailable",
+                                        "value": {
+                                            "message": "Domain pricing unavailable",
+                                            "details": "The pricing information required to process this request is temporarily unavailable. This is an internal system error. Please try again in a few minutes or contact support if the issue persists."
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -759,16 +859,34 @@ export const EMBEDDED_SPEC = {
                                 },
                                 "anyOf": [
                                     {
+                                        "type": "object",
+                                        "properties": {
+                                            "autorenewEnabled": {
+                                                "type": "boolean"
+                                            }
+                                        },
                                         "required": [
                                             "autorenewEnabled"
                                         ]
                                     },
                                     {
+                                        "type": "object",
+                                        "properties": {
+                                            "privacyEnabled": {
+                                                "type": "boolean"
+                                            }
+                                        },
                                         "required": [
                                             "privacyEnabled"
                                         ]
                                     },
                                     {
+                                        "type": "object",
+                                        "properties": {
+                                            "locked": {
+                                                "type": "boolean"
+                                            }
+                                        },
                                         "required": [
                                             "locked"
                                         ]
@@ -2155,7 +2273,7 @@ export const EMBEDDED_SPEC = {
                         "schema": {
                             "type": "string",
                             "example": "example.com",
-                            "format": "uri"
+                            "format": "hostname"
                         }
                     },
                     {
@@ -2291,7 +2409,7 @@ export const EMBEDDED_SPEC = {
                         "schema": {
                             "type": "string",
                             "example": "example.com",
-                            "format": "uri"
+                            "format": "hostname"
                         }
                     }
                 ],
@@ -2426,7 +2544,7 @@ export const EMBEDDED_SPEC = {
                         "schema": {
                             "type": "string",
                             "example": "example.com",
-                            "format": "uri"
+                            "format": "hostname"
                         }
                     },
                     {
@@ -2522,7 +2640,7 @@ export const EMBEDDED_SPEC = {
                         "schema": {
                             "type": "string",
                             "example": "example.com",
-                            "format": "uri"
+                            "format": "hostname"
                         }
                     },
                     {
@@ -2635,7 +2753,7 @@ export const EMBEDDED_SPEC = {
                         "schema": {
                             "type": "string",
                             "example": "example.com",
-                            "format": "uri"
+                            "format": "hostname"
                         }
                     },
                     {
@@ -3931,6 +4049,16 @@ export const EMBEDDED_SPEC = {
                         },
                         "description": "A successful response."
                     },
+                    "400": {
+                        "description": "Bad request - Invalid input data.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InvalidArgument400"
+                                }
+                            }
+                        }
+                    },
                     "404": {
                         "description": "Domain name not found.",
                         "content": {
@@ -4096,6 +4224,16 @@ export const EMBEDDED_SPEC = {
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "name": "X-Idempotency-Key",
+                        "in": "header",
+                        "description": "A unique string (e.g., a UUID v4) to make the request idempotent. This key ensures that if the request is retried, the operation will not be performed multiple times. Subsequent requests with the same key will return the original result.",
+                        "schema": {
+                            "type": "string",
+                            "example": "083910ef-04e4-4bd1-a0bf-3737fe005ca8"
+                        },
+                        "required": false
                     }
                 ],
                 "requestBody": {
@@ -4110,6 +4248,22 @@ export const EMBEDDED_SPEC = {
                 },
                 "responses": {
                     "200": {
+                        "headers": {
+                            "X-Idempotency-Key": {
+                                "description": "If the initial request contained this header, echoes back with the initial value.",
+                                "schema": {
+                                    "type": "string",
+                                    "example": "083910ef-04e4-4bd1-a0bf-3737fe005ca8"
+                                }
+                            },
+                            "X-Idempotent-Replay": {
+                                "description": "Indicates that the response is being replayed from an idempotent request. This header will only be returned if the API is responding with cached data. Caches are cleared after 12 hours.",
+                                "schema": {
+                                    "type": "number",
+                                    "example": 1
+                                }
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4135,6 +4289,22 @@ export const EMBEDDED_SPEC = {
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/PaymentRequired402"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "When sending idempotent requests, this response indicates that there was an issue with the idempotency keys.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Idempotency key has been reused for a different request"
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -4221,6 +4391,32 @@ export const EMBEDDED_SPEC = {
                         },
                         "description": "A successful response."
                     },
+                    "400": {
+                        "description": "Invalid purchase price.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InvalidArgument400"
+                                },
+                                "examples": {
+                                    "renewalPriceRequired": {
+                                        "summary": "Renewal price required",
+                                        "value": {
+                                            "message": "Invalid argument",
+                                            "details": "Purchase price is required in order to complete this request"
+                                        }
+                                    },
+                                    "premiumRenewalPriceRequired": {
+                                        "summary": "Premium renewal price required",
+                                        "value": {
+                                            "message": "Invalid argument",
+                                            "details": "Purchase price is required for premium domains in order to complete this request"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
                     "404": {
                         "description": "Domain name not found.",
                         "content": {
@@ -4237,6 +4433,25 @@ export const EMBEDDED_SPEC = {
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/UnsupportedMedia415"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Pricing information unavailable.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnprocessableEntity422"
+                                },
+                                "examples": {
+                                    "pricingUnavailable": {
+                                        "summary": "Pricing unavailable for domain",
+                                        "value": {
+                                            "message": "Domain pricing unavailable",
+                                            "details": "The pricing information required to process this request is temporarily unavailable. This is an internal system error. Please try again in a few minutes or contact support if the issue persists."
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -4269,7 +4484,7 @@ export const EMBEDDED_SPEC = {
         },
         "/core/v1/domains/{domainName}:setContacts": {
             "post": {
-                "description": "Updates WHOIS contact information for a domain. This includes the registrant, administrative, technical, and billing contacts.  All contact objects must be complete — partial updates are not supported.  You should fetch the existing contact data first (e.g., via [GetDomain](#operation/GetDomain) and modify only the values you wish to change.  This call replaces all four contact sets at once.",
+                "description": "Updates WHOIS contact information for a domain. This includes the registrant, administrative, technical, and billing contacts.  All contact objects must be complete — partial updates are not supported.  You should fetch the existing contact data first (e.g., via [GetDomain](#operation/GetDomain) and modify only the values you wish to change.  This call replaces all four contact sets at once.\n#### Contact Verification\nWhen registrant contact information is updated, validation may be triggered if the new contact information has not been previously validated. This validation is required by ICANN for all TLDs except country-code TLDs (ccTLDs). This validation involves sending an email to the provided address, prompting the recipient to click a link to verify their email address.",
                 "operationId": "SetContacts",
                 "parameters": [
                     {
@@ -4654,6 +4869,16 @@ export const EMBEDDED_SPEC = {
                             }
                         }
                     },
+                    "422": {
+                        "description": "The request was well-formed but contains no valid domains to check. This occurs when all provided domain names contain TLDs that are not supported or available for registration. The request must contain at least one domain with a valid TLD.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnprocessableEntity422"
+                                }
+                            }
+                        }
+                    },
                     "429": {
                         "description": "Rate limit has been exceeded.",
                         "content": {
@@ -4926,6 +5151,16 @@ export const EMBEDDED_SPEC = {
                             }
                         }
                     },
+                    "409": {
+                        "description": "The API will return this response if you are attempting to subscribe to a webhook you have already subscribed to.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Conflict409"
+                                }
+                            }
+                        }
+                    },
                     "415": {
                         "description": "All POST, PUT, PATCH requests for this API must include the `Content-Type: application/json` header in the requests.",
                         "content": {
@@ -5061,7 +5296,8 @@ export const EMBEDDED_SPEC = {
                                     "url": {
                                         "type": "string",
                                         "description": "Optionally update the URL we send the webhook data to",
-                                        "example": "https://example2.com"
+                                        "example": "https://example2.com",
+                                        "format": "uri"
                                     },
                                     "active": {
                                         "type": "boolean",
@@ -5071,11 +5307,23 @@ export const EMBEDDED_SPEC = {
                                 },
                                 "anyOf": [
                                     {
+                                        "type": "object",
+                                        "properties": {
+                                            "url": {
+                                                "type": "string"
+                                            }
+                                        },
                                         "required": [
                                             "url"
                                         ]
                                     },
                                     {
+                                        "type": "object",
+                                        "properties": {
+                                            "active": {
+                                                "type": "boolean"
+                                            }
+                                        },
                                         "required": [
                                             "active"
                                         ]
@@ -5474,18 +5722,34 @@ export const EMBEDDED_SPEC = {
                             }
                         }
                     },
-                    "429": {
+                    "422": {
+                        "description": "Pricing information unavailable.",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/InvalidArgument400"
+                                    "$ref": "#/components/schemas/UnprocessableEntity422"
                                 },
-                                "example": {
-                                    "message": "Too Many Concurrent Requests"
+                                "examples": {
+                                    "pricingUnavailable": {
+                                        "summary": "Pricing unavailable for domain",
+                                        "value": {
+                                            "message": "Domain pricing unavailable",
+                                            "details": "The pricing information required to process this request is temporarily unavailable. This is an internal system error. Please try again in a few minutes or contact support if the issue persists."
+                                        }
+                                    }
                                 }
                             }
-                        },
-                        "description": "We can only process one (1) order for your account at a time. We will return this response when an order is still processing, but an attempt to create a new order is made."
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit has been exceeded.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TooManyRequests429"
+                                }
+                            }
+                        }
                     },
                     "500": {
                         "content": {
@@ -5705,6 +5969,8 @@ export const EMBEDDED_SPEC = {
                                                 "supportsTransferLock": true,
                                                 "supportsDnssec": true,
                                                 "supportsPremium": true,
+                                                "supportsPrivacy": true,
+                                                "requiresPreDelegation": true,
                                                 "expirationGracePeriod": 3,
                                                 "idnLanguages": {},
                                                 "allowedRegistrationYears": [
@@ -5718,7 +5984,10 @@ export const EMBEDDED_SPEC = {
                                                     8,
                                                     9,
                                                     10
-                                                ]
+                                                ],
+                                                "hsts": false,
+                                                "minDomainLength": 5,
+                                                "minIdnDomainLength": 5
                                             },
                                             "requirements": {
                                                 "description": "Registration requirements for .fr domains",
@@ -6018,7 +6287,12 @@ export const EMBEDDED_SPEC = {
                                                 "supportsTransferLock": true,
                                                 "supportsDnssec": true,
                                                 "supportsPremium": true,
+                                                "supportsPrivacy": true,
+                                                "requiresPreDelegation": true,
                                                 "expirationGracePeriod": 25,
+                                                "hsts": false,
+                                                "minDomainLength": 3,
+                                                "minIdnDomainLength": 4,
                                                 "idnLanguages": {
                                                     "AR": "Arabic",
                                                     "GREK": "Greek",
@@ -6068,7 +6342,12 @@ export const EMBEDDED_SPEC = {
                                                 "supportsTransferLock": false,
                                                 "supportsDnssec": true,
                                                 "supportsPremium": false,
+                                                "supportsPrivacy": false,
+                                                "requiresPreDelegation": false,
                                                 "expirationGracePeriod": 3,
+                                                "hsts": true,
+                                                "minDomainLength": 3,
+                                                "minIdnDomainLength": null,
                                                 "idnLanguages": {},
                                                 "allowedRegistrationYears": [
                                                     1,
@@ -6139,7 +6418,7 @@ export const EMBEDDED_SPEC = {
         },
         "/core/v1/tldpricing": {
             "get": {
-                "description": "Get an alphabetical pricing list of all TLDs supported by name.com. The pricing returned will be your account level price in US Dollars (USD) and is the price you pay for non-premium registrations.\n\n**Please Note:** This is general pricing for domains registered with the specified TLD. Individual domains may have different pricing based on a large number of factors.\nIf you are trying to see pricing for a specific individual domain, you will need to use the [Get Pricing For Domain API](#tag/Domains/operation/GetPricingForDomain).\n\nPlease note that if `null` is returned for any of the prices, it means that particular product is unavailable at name.com at the time of the request.\nFor example, if `registrationPrice` returns as `null` in the response, it means that name.com is not currently accepting registrations for that TLD.\n\nAny IDN TLDs will return in their unicode format.\n",
+                "description": "Get an alphabetical pricing list of all TLDs supported by name.com. The pricing returned will be your account level price in US Dollars (USD) and is the price you pay for non-premium registrations.\n\n**Please Note:** This is general pricing for domains registered with the specified TLD. Individual domains may have different pricing based on a large number of factors.\nIf you are trying to see pricing for a specific individual domain, you will need to use the [GetPricingForDomain](https://docs.name.com/api-spec-cdn/namecom.api/domains/getpricingfordomain) endpoint.\n\nPlease note that if `null` is returned for any of the prices, it means that particular product is unavailable at name.com at the time of the request.\nFor example, if `registrationPrice` returns as `null` in the response, it means that name.com is not currently accepting registrations for that TLD.\n\nAny IDN TLDs will return in their unicode format.\n",
                 "operationId": "TldPriceList",
                 "parameters": [
                     {
@@ -6178,7 +6457,7 @@ export const EMBEDDED_SPEC = {
                     },
                     {
                         "name": "tlds",
-                        "description": "A list of specific TLDs to get pricing for. Maximum of 25 TLDs can be requested at a time. When querying for IDN TLDs, due to character restrictions within a URL, they must be submitted in ASCII format. This means using \"xn--9dbq2a\" as opposed to it's unicode equivalent.",
+                        "description": "A list of specific TLDs to get pricing for. Maximum of 25 TLDs can be requested at a time.  When querying for IDN TLDs, due to character restrictions within a URL, they must be submitted in ASCII format.  This means using \"xn--9dbq2a\" as opposed to it's unicode equivalent. The submitted TLDs will be checked for validity and support at name.com, and any invalid TLD will be removed from the submitted list. If all submitted TLDs are invalid or not supported by name.com, this will be considered a bad request, and a `400 Bad Request` will be returned with an appropriate message.",
                         "in": "query",
                         "required": false,
                         "schema": {
@@ -6187,8 +6466,15 @@ export const EMBEDDED_SPEC = {
                             "maxItems": 25,
                             "items": {
                                 "type": "string"
-                            }
-                        }
+                            },
+                            "example": [
+                                "com",
+                                "net",
+                                "org"
+                            ]
+                        },
+                        "style": "form",
+                        "explode": true
                     }
                 ],
                 "responses": {
@@ -6237,24 +6523,406 @@ export const EMBEDDED_SPEC = {
                     "TLD Pricing"
                 ]
             }
+        },
+        "/core/v1/zonecheck": {
+            "post": {
+                "description": "Zone Check offers a rapid, preliminary check for domain availability by leveraging cached zone file data.  Ideal for large-batch queries, it provides a high confidence indication of a domain's availability significantly faster than live registry checks.  For definitive, real-time availability and pricing, you can follow up with the standard Check Availability call.\nThe API first validates each submitted domain. Invalid domains are filtered out, and their count is returned in the removed field of the response.  If no valid domains remain after this process, the API returns a `400 Bad Request` response.\n**Note:** The cached zone files used for this check are refreshed twice daily based on the latest available data from the registries.",
+                "operationId": "ZoneCheck",
+                "summary": "Zone Check",
+                "tags": [
+                    "Domains"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ZoneCheckRequest"
+                            }
+                        }
+                    },
+                    "description": "Request body to check for availability",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ZoneCheckResponse"
+                                }
+                            }
+                        },
+                        "description": "Successful response for a DNS zone check."
+                    },
+                    "400": {
+                        "description": "Bad request - Invalid input data.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InvalidArgument400"
+                                }
+                            }
+                        }
+                    },
+                    "415": {
+                        "description": "All POST, PUT, PATCH requests for this API must include the `Content-Type: application/json` header in the requests.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnsupportedMedia415"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Returned when, after cleaning, there were no valid domains passed in the request.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnprocessableEntity422"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit has been exceeded.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TooManyRequests429"
+                                }
+                            }
+                        },
+                        "headers": {
+                            "x-ratelimit-reset": {
+                                "description": "Unix timestamp for the time at which the current rate limit will reset.",
+                                "schema": {
+                                    "type": "number",
+                                    "example": 1747668270
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GenericError500"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "There was a temporary error in processing the request. The request can be retried immediately.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadGateway502"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/core/v1/premiumdomainslist": {
+            "get": {
+                "description": "Gets a pre-signed URL that will allow a user to download a list of premium domains, with their registration and renewal pricing.\n**Please Note:** The pre-signed URL will only be valid for 10 minutes. This endpoint is only available to approved reseller accounts. Contact name.com support to request access.",
+                "operationId": "PremiumDomainLists",
+                "summary": "Download Premium Domain Lists",
+                "tags": [
+                    "Premium Domains"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "A successful response containing the pre-signed URL to download the file.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PremiumDomainsDownloadResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Unauthorized401"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Only authorized accounts have access to this endpoint. To request access, please contact our support team.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GenericForbidden403"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit has been exceeded.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TooManyRequests429"
+                                }
+                            }
+                        },
+                        "headers": {
+                            "x-ratelimit-reset": {
+                                "description": "Unix timestamp for the time at which the current rate limit will reset.",
+                                "schema": {
+                                    "type": "number",
+                                    "example": 1747668270
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GenericError500"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/core/v1/contacts/unverified": {
+            "get": {
+                "description": "Returns a list of contacts, related to domains within your account, that require verification as per ICANN procedures.\nWhen a new domain is created, unverified contacts are not immediately available in API responses.  Records are added by a scheduled process that runs approximately every 10 minutes.  As a result, there may be up to a 10-minute delay before unverified contacts appear in the API. This delay also applies to related events such as webhooks or other downstream systems that depend on contact verification data. \nThis API is only available to approved reseller accounts. Contact name.com support to request access.",
+                "operationId": "UnverifiedContactsList",
+                "summary": "List Unverified Contacts",
+                "tags": [
+                    "Contact Verification"
+                ],
+                "parameters": [
+                    {
+                        "description": "PerPage is the number of records to return per request. If not passed in the request, the default value is 100 records.",
+                        "in": "query",
+                        "name": "perPage",
+                        "schema": {
+                            "format": "int32",
+                            "type": "integer",
+                            "example": 100,
+                            "default": 100,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "description": "Page is which page to return. If not passed in the request, the default page is 1.",
+                        "in": "query",
+                        "name": "page",
+                        "schema": {
+                            "format": "int32",
+                            "type": "integer",
+                            "example": 2,
+                            "default": 1,
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "A successful response containing an array of unverified contacts.  This array may be empty if there are no unverified contacts related to domains in your account.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnverifiedContactsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Unauthorized401"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Only authorized accounts have access to this endpoint. To request access, please contact our support team.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GenericForbidden403"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit has been exceeded.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TooManyRequests429"
+                                }
+                            }
+                        },
+                        "headers": {
+                            "x-ratelimit-reset": {
+                                "description": "Unix timestamp for the time at which the current rate limit will reset.",
+                                "schema": {
+                                    "type": "number",
+                                    "example": 1747668270
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GenericError500"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/core/v1/contacts/verify/{verificationId}": {
+            "post": {
+                "description": "Use this API to verify a contact.\nThis API is only available to approved reseller accounts. Contact name.com support to request access.",
+                "summary": "Verify Contact",
+                "operationId": "VerifyContact",
+                "tags": [
+                    "Contact Verification"
+                ],
+                "parameters": [
+                    {
+                        "description": "The VerificationId required to verify a specific contact.",
+                        "in": "path",
+                        "name": "verificationId",
+                        "schema": {
+                            "format": "int32",
+                            "type": "integer"
+                        },
+                        "required": true,
+                        "example": 98752463
+                    },
+                    {
+                        "name": "X-Idempotency-Key",
+                        "in": "header",
+                        "description": "A unique string (e.g., a UUID v4) to make the request idempotent. This key ensures that if the request is retried, the operation will not be performed multiple times. Subsequent requests with the same key will return the original result.",
+                        "schema": {
+                            "type": "string",
+                            "example": "083910ef-04e4-4bd1-a0bf-3737fe005ca8"
+                        },
+                        "required": false
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Contact has been successfully verified."
+                    },
+                    "401": {
+                        "description": "Unauthorized.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Unauthorized401"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Only authorized accounts have access to this endpoint. To request access, please contact our support team.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GenericForbidden403"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "The submitted verificationId was not found.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFound404"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "When sending idempotent requests, this response indicates that there was an issue with the idempotency keys.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Idempotency key has been reused for a different request."
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit has been exceeded.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TooManyRequests429"
+                                }
+                            }
+                        },
+                        "headers": {
+                            "x-ratelimit-reset": {
+                                "description": "Unix timestamp for the time at which the current rate limit will reset.",
+                                "schema": {
+                                    "type": "number",
+                                    "example": 1747668270
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GenericError500"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "webhooks": {
-        "domainTransferStatusChange": {
+        "accountCreditBalanceChange": {
             "post": {
                 "tags": [
                     "Webhook Notifications"
                 ],
-                "operationId": "DomainTransferStatusChangeWebhook",
-                "summary": "Domain Transfer Status Change",
-                "description": "Sent when you have subscribed to the event on your account, and a domain transfer is processing.",
+                "operationId": "AccountCreditBalanceChangeWebhook",
+                "summary": "Webhook for credit balance changes",
+                "description": "This is the payload that will be sent to the subscribed URL, when a changed to the amount of account credit for an account changes. This will trigger on both increases and decreases in account credit for the account.",
                 "requestBody": {
-                    "description": "The request sent to your server.",
                     "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/DomainTransferStatusChange"
+                                "$ref": "#/components/schemas/AccountCreditBalanceChange"
                             }
                         }
                     }
@@ -6272,20 +6940,67 @@ export const EMBEDDED_SPEC = {
                 }
             }
         },
-        "accountCreditBalanceChange": {
+        "domainLockStatusChange": {
             "post": {
                 "tags": [
                     "Webhook Notifications"
                 ],
-                "operationId": "AccountCreditBalanceChangeWebhook",
-                "summary": "Webhook for credit balance changes",
-                "description": "This is the payload that will be sent to the subscribed URL, when a changed to the amount of account credit for an account changes. This will trigger on both increases and decreases in account credit for the account.",
+                "operationId": "DomainLockStatusChangeWebhook",
+                "summary": "Domain Lock Status Change",
+                "description": "Sent when a domain lock is added or removed, which may restrict or lift normal operations. This event is triggered automatically whenever covered lock types (e.g., compliance or verification holds) are added or removed. A webhook payload is delivered to the subscribed endpoint, providing details about the domain and its updated status.",
                 "requestBody": {
                     "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/AccountCreditBalanceChange"
+                                "$ref": "#/components/schemas/DomainLockStatusChange"
+                            },
+                            "examples": {
+                                "example": {
+                                    "value": {
+                                        "eventName": "domain.lock.status_change",
+                                        "domainName": "example.org",
+                                        "action": "added",
+                                        "lockType": "ClientHold",
+                                        "registryStatuses": [
+                                            "clientHold",
+                                            "clientTransferProhibited",
+                                            "clientUpdateProhibited"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The subscribed server accepted the request."
+                    },
+                    "4xx": {
+                        "description": "The subscribed server returned an error (bad request, Unauthenticated etc)."
+                    },
+                    "5xx": {
+                        "description": "The subscribed server experienced an error while processing the request."
+                    }
+                }
+            }
+        },
+        "domainTransferStatusChange": {
+            "post": {
+                "tags": [
+                    "Webhook Notifications"
+                ],
+                "operationId": "DomainTransferStatusChangeWebhook",
+                "summary": "Domain Transfer Status Change",
+                "description": "Sent when you have subscribed to the event on your account, and a domain transfer is processing.",
+                "requestBody": {
+                    "description": "The request sent to your server.",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DomainTransferStatusChange"
                             }
                         }
                     }
@@ -6343,9 +7058,6 @@ export const EMBEDDED_SPEC = {
             },
             "TooManyRequests429": {
                 "type": "object",
-                "required": [
-                    "message"
-                ],
                 "properties": {
                     "message": {
                         "type": "string",
@@ -6471,6 +7183,102 @@ export const EMBEDDED_SPEC = {
                     "phone"
                 ]
             },
+            "RegistrantContact": {
+                "description": "Contact contains all relevant contact data for a domain registrant.",
+                "type": "object",
+                "properties": {
+                    "firstName": {
+                        "description": "First name of the contact.",
+                        "type": "string",
+                        "example": "John",
+                        "minLength": 1
+                    },
+                    "lastName": {
+                        "description": "Last name of the contact.",
+                        "type": "string",
+                        "example": "Doe",
+                        "minLength": 1
+                    },
+                    "companyName": {
+                        "description": "Company name of the contact. Leave blank if the contact is an individual. Please be advised that ICANN policy links the \"Company Name\" field (Organization) in your domain's contact details to its legal ownership. If this field contains information, the listed organization is considered the legal \"Registered Name Holder\" (domain owner).",
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "example": "Example Inc."
+                    },
+                    "address1": {
+                        "description": "The first line of the contact's address.",
+                        "type": "string",
+                        "example": "123 Main Street",
+                        "minLength": 1
+                    },
+                    "address2": {
+                        "description": "The second line of the contact's address (optional).",
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "example": "Suite 400"
+                    },
+                    "city": {
+                        "description": "City of the contact's address.",
+                        "type": "string",
+                        "example": "New York",
+                        "minLength": 1
+                    },
+                    "state": {
+                        "description": "State or Province of the contact's address.",
+                        "type": "string",
+                        "example": "NY",
+                        "minLength": 1
+                    },
+                    "zip": {
+                        "description": "ZIP or Postal Code of the contact's address.",
+                        "type": "string",
+                        "example": "10001",
+                        "minLength": 1
+                    },
+                    "country": {
+                        "description": "Country code for the contact's address. Must be an ISO 3166-1 alpha-2 country code.",
+                        "type": "string",
+                        "example": "US",
+                        "pattern": "^[A-Z]{2}$"
+                    },
+                    "email": {
+                        "description": "Email address of the contact. Must be a valid email format. The validation is performed against the `addr-spec` syntax in [RFC 822](https://datatracker.ietf.org/doc/html/rfc822)",
+                        "type": "string",
+                        "format": "email",
+                        "example": "john.doe@example.com"
+                    },
+                    "phone": {
+                        "description": "Phone number of the contact. Should follow the E.164 international format: \"+[country code][number]\".",
+                        "type": "string",
+                        "pattern": "^\\+[1-9]\\d{7,14}$",
+                        "example": "+15551234567"
+                    },
+                    "fax": {
+                        "description": "Fax number of the contact. Should follow the E.164 international format: \"+[country code][number]\".",
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "pattern": "^\\+[1-9]\\d{7,14}$",
+                        "example": "+15557654321"
+                    }
+                },
+                "required": [
+                    "firstName",
+                    "lastName",
+                    "address1",
+                    "city",
+                    "state",
+                    "zip",
+                    "country",
+                    "email",
+                    "phone"
+                ]
+            },
             "Contacts": {
                 "description": "Contacts stores the contact information for the roles related to domains.",
                 "properties": {
@@ -6481,7 +7289,7 @@ export const EMBEDDED_SPEC = {
                         "$ref": "#/components/schemas/Contact"
                     },
                     "registrant": {
-                        "$ref": "#/components/schemas/Contact"
+                        "$ref": "#/components/schemas/RegistrantContact"
                     },
                     "tech": {
                         "$ref": "#/components/schemas/Contact"
@@ -6727,6 +7535,58 @@ export const EMBEDDED_SPEC = {
                     }
                 }
             },
+            "domainName": {
+                "description": "The punycode-encoded value of the domain name.",
+                "type": "string",
+                "example": "example.com"
+            },
+            "createDate": {
+                "description": "The date and time when the domain was created at the registry.",
+                "type": "string",
+                "format": "date-time",
+                "example": "2023-01-15T14:30:00Z",
+                "readOnly": true
+            },
+            "expireDate": {
+                "description": "The date and time when the domain will expire.",
+                "type": "string",
+                "format": "date-time",
+                "example": "2025-01-15T14:30:00Z",
+                "readOnly": true
+            },
+            "autorenewEnabled": {
+                "description": "Indicates whether the domain is set to renew automatically before expiration.",
+                "type": "boolean",
+                "example": true
+            },
+            "locked": {
+                "description": "Indicates if the domain is locked, preventing transfers to another registrar.",
+                "type": "boolean",
+                "example": true
+            },
+            "privacyEnabled": {
+                "description": "Indicates if Whois Privacy is enabled for this domain.",
+                "type": "boolean",
+                "example": true
+            },
+            "nameservers": {
+                "description": "The list of nameservers assigned to this domain. If unspecified, it defaults to the account's default nameservers.",
+                "type": "array",
+                "items": {
+                    "type": "string"
+                },
+                "example": [
+                    "ns1.example.com",
+                    "ns2.example.com"
+                ]
+            },
+            "renewalPrice": {
+                "description": "The cost to renew the domain. This may be required for the RenewDomain operation.",
+                "type": "number",
+                "format": "double",
+                "example": 12.99,
+                "readOnly": true
+            },
             "DomainResponsePayload": {
                 "description": "The response format for a domain.",
                 "allOf": [
@@ -6735,6 +7595,35 @@ export const EMBEDDED_SPEC = {
                     },
                     {
                         "type": "object",
+                        "properties": {
+                            "domainName": {
+                                "$ref": "#/components/schemas/domainName"
+                            },
+                            "createDate": {
+                                "$ref": "#/components/schemas/createDate"
+                            },
+                            "expireDate": {
+                                "$ref": "#/components/schemas/expireDate"
+                            },
+                            "autorenewEnabled": {
+                                "$ref": "#/components/schemas/autorenewEnabled"
+                            },
+                            "locked": {
+                                "$ref": "#/components/schemas/locked"
+                            },
+                            "privacyEnabled": {
+                                "$ref": "#/components/schemas/privacyEnabled"
+                            },
+                            "contacts": {
+                                "$ref": "#/components/schemas/Contacts"
+                            },
+                            "nameservers": {
+                                "$ref": "#/components/schemas/nameservers"
+                            },
+                            "renewalPrice": {
+                                "$ref": "#/components/schemas/renewalPrice"
+                            }
+                        },
                         "required": [
                             "domainName",
                             "createDate",
@@ -6803,7 +7692,12 @@ export const EMBEDDED_SPEC = {
                         "type": "object",
                         "required": [
                             "domainName"
-                        ]
+                        ],
+                        "properties": {
+                            "domainName": {
+                                "type": "string"
+                            }
+                        }
                     }
                 ]
             },
@@ -6826,7 +7720,7 @@ export const EMBEDDED_SPEC = {
                         "additionalProperties": {
                             "type": "string"
                         },
-                        "description": "TLDRequirements is a way to pass additional data that is required by some registries.",
+                        "description": "TLDRequirements is a way to pass additional data that is required by some registries. You can check before registration by using the [Domain Info](#operation/GetRequirement) API.\nAs these requirements vary wildly between registries and TLDs, we are not attempting to document them here.\n#### IDN Domains\nThis parameter is required for registering domains that contain non-ASCII characters.  The value should be the specific code for the character set, such as `ES` for Spanish, or `CYRL` for Cyrillic. These abbreviations can vary between TLDs, and it is highly recommended that you use [Domain Info](#operation/GetRequirement) API to ensure that the TLD allows for the specific IDN table, as well as the correct abbreviation.",
                         "type": "object"
                     },
                     "years": {
@@ -6904,6 +7798,24 @@ export const EMBEDDED_SPEC = {
                         ],
                         "description": "Additional context or information about the error",
                         "example": "The requested domain does not exist."
+                    }
+                }
+            },
+            "UnprocessableEntity422": {
+                "type": "object",
+                "required": [
+                    "message"
+                ],
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "description": "A human-readable message providing more details about the error",
+                        "example": "Unprocessable Entity"
+                    },
+                    "details": {
+                        "type": "string",
+                        "description": "Additional context or information about the pricing error",
+                        "example": "The pricing information required to process this request is temporarily unavailable. This is an internal system error. Please try again in a few minutes or contact support if the issue persists."
                     }
                 }
             },
@@ -7619,21 +8531,30 @@ export const EMBEDDED_SPEC = {
                         "type": "boolean"
                     },
                     "purchasePrice": {
-                        "description": "PurchasePrice is the price you will pay to register a domain. Can be passed in the CreateDomain request.",
+                        "description": "PurchasePrice is the price you will pay to register a domain. Can be passed in the CreateDomain request. If purchasePrice returns as null, it means that name.com is not currently accepting registrations for this combination of TLD and duration. If this is unexpected, please contact support.",
                         "format": "double",
-                        "type": "number",
+                        "type": [
+                            "number",
+                            "null"
+                        ],
                         "example": 24.99
                     },
                     "renewalPrice": {
-                        "description": "RenewalPrice is the price you will pay to renew a domain. Can be passed in the RenewDomain request.",
+                        "description": "RenewalPrice is the price you will pay to renew a domain. Can be passed in the RenewDomain request. If renewalPrice returns as null, it means that name.com is not currently accepting renewals for this combination of TLD and duration. If this is unexpected, please contact support.",
                         "format": "double",
-                        "type": "number",
+                        "type": [
+                            "number",
+                            "null"
+                        ],
                         "example": 24.99
                     },
                     "transferPrice": {
-                        "description": "TransferPrice is the price you will pay to transfer a domain. Can be passed in the CreateTransfer request. The TransferPrice is always for 1 year regardless of the years input.",
+                        "description": "TransferPrice is the price you will pay to transfer a domain. Can be passed in the CreateTransfer request. The TransferPrice is always for 1 year regardless of the years input. If transferPrice returns as null, it means that name.com is not currently accepting transfers for this combination of TLD and duration. If this is unexpected, please contact support.",
                         "format": "double",
-                        "type": "number",
+                        "type": [
+                            "number",
+                            "null"
+                        ],
                         "example": 24.99
                     }
                 },
@@ -7975,8 +8896,9 @@ export const EMBEDDED_SPEC = {
                 "description": "The list of configured webhooks you can subscribe to",
                 "type": "string",
                 "enum": [
-                    "domain.transfer.status_change",
-                    "account.credit.balance_change"
+                    "account.credit.balance_change",
+                    "domain.lock.status_change",
+                    "domain.transfer.status_change"
                 ]
             },
             "SubscribeToNotification": {
@@ -8009,6 +8931,24 @@ export const EMBEDDED_SPEC = {
                 },
                 "title": "Response from subscribing to a notification",
                 "type": "object"
+            },
+            "Conflict409": {
+                "type": "object",
+                "required": [
+                    "message"
+                ],
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "description": "A human-readable message providing more details about the error",
+                        "example": "Conflict"
+                    },
+                    "details": {
+                        "type": "string",
+                        "description": "Additional context or information about the pricing error",
+                        "example": "You are attempting to subscribe to an event you have already subscribed to."
+                    }
+                }
             },
             "ModifySubscriptionResponse": {
                 "properties": {
@@ -8231,9 +9171,22 @@ export const EMBEDDED_SPEC = {
                         "example": "admin@example.com"
                     },
                     "status": {
-                        "description": "The current status of the transfer. Details about statuses can be found in the following Knowledge Base article: <https://www.name.com/support/articles/115012519688-transfer-status-faq>.",
+                        "description": "The updated status of the domain transfer. The transfer status will be one of the following values:\n  - **canceled:** The transfer has been canceled by the user.\n  - **canceled_pending_refund**: The transfer has been canceled by the user, and a refund for the price is being processed.\n  - **completed**: The transfer has completed.\n  - **failed**: The transfer has failed, and will not be retried.\n  - **pending**: The transfer has been requested, and is pending.\n  - **pending_insert**: The transfer has completed and the domain will soon be inserted into the account.\n  - **pending_new_auth_code**: A new authcode is required to complete the transfer.\n  - **pending_transfer**: The transfer has been requested, and is pending.\n  - **pending_unlock**: The domain to be transferred is currently in a locked state at the losing registrar, and will begin processing once the lock has been removed.\n  - **rejected**: The transfer has been rejected at the losing registrar and will not be retried.\n  - **submitting_transfer**: The transfer has been initiated and will soon be submitted to the registry.",
                         "type": "string",
-                        "example": "pending_transfer"
+                        "example": "pending_transfer",
+                        "enum": [
+                            "canceled",
+                            "canceled_pending_refund",
+                            "completed",
+                            "failed",
+                            "pending",
+                            "pending_insert",
+                            "pending_new_auth_code",
+                            "pending_transfer",
+                            "pending_unlock",
+                            "rejected",
+                            "submitting_transfer"
+                        ]
                     }
                 },
                 "required": [
@@ -8373,6 +9326,16 @@ export const EMBEDDED_SPEC = {
                         "type": "boolean",
                         "example": true
                     },
+                    "supportsPrivacy": {
+                        "description": "Whether the TLD supports WHOIS Privacy.",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "requiresPreDelegation": {
+                        "description": "Whether this TLD requires pre-delegation. If this is true, these domains must be added to the name servers before the domain creation is completed.",
+                        "type": "boolean",
+                        "example": true
+                    },
                     "expirationGracePeriod": {
                         "description": "The number of days you have to renew your domain after it has expired, but before it is removed from your account.",
                         "type": "number",
@@ -8406,6 +9369,26 @@ export const EMBEDDED_SPEC = {
                             "IT": "Italian",
                             "JP": "Japanese"
                         }
+                    },
+                    "hsts": {
+                        "description": "The entire TLD namespace has been added to the HSTS Preload list. As such, all second-level domains under .TLD will only load on modern browsers if a valid SSL certificate has been configured and the webserver is serving HTTPS.",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "minDomainLength": {
+                        "description": "The minimum allowed length for the second level domain (SLD) for a given TLD. The SLD would be the `example` part of `example.com`. Attempts to register a domain with a shorter length than allowed will result in a failure of a Create Domain request.",
+                        "type": "number",
+                        "format": "int32",
+                        "example": 3
+                    },
+                    "minIdnDomainLength": {
+                        "description": "The minimum allowed length for the second level domain (SLD) that utilizes an IDN character for a given TLD.  The SLD would be the `èxample` part of `èxample.com`. Attempts to register a domain with a shorter length than allowed will result in a failure of a Create Domain request. This value will often be different from the `minDomainLength` for non-IDN registrations.  This parameter will return as `null` for any TLDs that do not support IDN registrations.",
+                        "type": [
+                            "number",
+                            "null"
+                        ],
+                        "format": "int32",
+                        "example": 5
                     }
                 },
                 "required": [
@@ -8414,9 +9397,14 @@ export const EMBEDDED_SPEC = {
                     "supportsTransferLock",
                     "supportsDnssec",
                     "supportsPremium",
+                    "supportsPrivacy",
+                    "requiresPreDelegation",
                     "expirationGracePeriod",
                     "idnLanguages",
-                    "allowedRegistrationYears"
+                    "allowedRegistrationYears",
+                    "hsts",
+                    "minDomainLength",
+                    "minIdnDomainLength"
                 ]
             },
             "RequirementField": {
@@ -8723,25 +9711,210 @@ export const EMBEDDED_SPEC = {
                     "pricing"
                 ]
             },
-            "DomainTransferStatusChange": {
+            "ZoneCheckRequest": {
+                "description": "ZoneCheck request checks DNS zone files for the availability of the specified domains.",
                 "type": "object",
                 "properties": {
-                    "eventName": {
-                        "type": "string",
-                        "description": "The name of the subscription event"
-                    },
-                    "domainName": {
-                        "type": "string",
-                        "description": "The domain that the transfer status has changed for"
-                    },
-                    "status": {
-                        "type": "string",
-                        "description": "The updated status of the domain transfer. The transfer status will be one of the following values:\n- **canceled:** The transfer has been canceled by the user.\n- **canceled_pending_refund**: The transfer has been canceled by the user, and a refund for the price is being processed.\n- **completed**: The transfer has completed.\n- **failed**: The transfer has failed, and will not be retried.\n- **pending**: The transfer has been requested, and is pending.\n- **pending_insert**: The transfer has completed and the domain will soon be inserted into the account.\n- **pending_new_auth_code**: A new authcode is required to complete the transfer.\n- **pending_transfer**: The transfer has been requested, and is pending.\n- **pending_unlock**: The domain to be transferred is currently in a locked state at the losing registrar, and will begin processing once the lock has been removed.\n- **rejected**: The transfer has been rejected at the losing registrar and will not be retried.\n- **submitting_transfer**: The transfer has been initiated and will soon be submitted to the registry.\n"
+                    "domainNames": {
+                        "description": "Array of domains to check",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "minItems": 1,
+                        "maxItems": 500,
+                        "examples": [
+                            [
+                                "example.com",
+                                "example.net",
+                                "example.org"
+                            ],
+                            [
+                                "test.net"
+                            ]
+                        ]
                     }
                 },
                 "required": [
-                    "eventName",
-                    "domainName"
+                    "domainNames"
+                ]
+            },
+            "ZoneCheckResult": {
+                "description": "Result for checking and individual domain's presense in DNS zone files.",
+                "type": "object",
+                "properties": {
+                    "domainName": {
+                        "description": "The domain name that was checked",
+                        "type": "string",
+                        "example": "example.com"
+                    },
+                    "available": {
+                        "description": "If the domain is potentially available for purchase after checking for it's presense in the DNZ zone files.",
+                        "type": [
+                            "boolean",
+                            "null"
+                        ],
+                        "examples": [
+                            true,
+                            false,
+                            null
+                        ]
+                    }
+                },
+                "required": [
+                    "domainName",
+                    "available"
+                ]
+            },
+            "ZoneCheckResponse": {
+                "description": "Response for checking domain availability via DNS zone checks.",
+                "type": "object",
+                "properties": {
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ZoneCheckResult",
+                            "minLength": 0
+                        }
+                    },
+                    "total": {
+                        "description": "Total number of records checked",
+                        "type": "number",
+                        "format": "int32",
+                        "example": 5
+                    },
+                    "removed": {
+                        "description": "Total number of domains removed from the check because they are invalid",
+                        "type": "number",
+                        "format": "int32",
+                        "example": 1
+                    }
+                },
+                "required": [
+                    "results",
+                    "total"
+                ]
+            },
+            "PremiumDomainsDownloadResponse": {
+                "type": "object",
+                "properties": {
+                    "downloadUrl": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "The pre-signed URL to use to download the list.",
+                        "example": "https://name-ote-downloads/PremiumList_123456.zip",
+                        "readOnly": true
+                    },
+                    "expireDate": {
+                        "description": "The timestamp that the URL will expire.",
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2025-09-04T16:45:00Z",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "downloadUrl",
+                    "expireDate"
+                ]
+            },
+            "UnverifiedContact": {
+                "type": "object",
+                "description": "The pertinent information used to identifiy a domain contact that requires verification as per ICANN requirements.",
+                "properties": {
+                    "verificationId": {
+                        "description": "The id of the verification record for the contact. Please note, this is different than the `contact_id` that may be returned in other API contexts. This id specifically relates to the verification and will be different than an `contact_id` for the same contact record in other contexts.",
+                        "type": "number",
+                        "format": "int64",
+                        "example": 4897668
+                    },
+                    "createDate": {
+                        "description": "The date the record requiring verification was created.",
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2025-01-01T15:35:06Z",
+                        "readOnly": true
+                    },
+                    "verifyBy": {
+                        "description": "The date/time that the contact record **must** be verified by.  If the contact record is not verified by this date, the domain may become locked by the registry. This is typically 15 days from the creation date of the verification record, but may vary by TLD and registry.",
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2025-01-16T15:35:06Z",
+                        "readOnly": true
+                    },
+                    "email": {
+                        "description": "The email address of the contact to be verified. This is the primary identifier used for verification.",
+                        "type": "string",
+                        "format": "email",
+                        "example": "admin@example.com",
+                        "readOnly": true
+                    },
+                    "domains": {
+                        "description": "A list of the domains that the contact verification record is applied to.",
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "format": "hostname"
+                        },
+                        "minItems": 1
+                    }
+                },
+                "required": [
+                    "verificationId",
+                    "createDate",
+                    "verifyBy",
+                    "email",
+                    "domains"
+                ]
+            },
+            "UnverifiedContactsResponse": {
+                "description": "A list of unverified contacts that relate to your account.",
+                "type": "object",
+                "properties": {
+                    "unverifiedContacts": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/UnverifiedContact"
+                        }
+                    },
+                    "from": {
+                        "description": "From is the starting record for the current page.",
+                        "type": "integer",
+                        "format": "int32",
+                        "example": 1
+                    },
+                    "to": {
+                        "description": "To is the ending record for the current page.",
+                        "type": "integer",
+                        "format": "int32",
+                        "example": 25
+                    },
+                    "lastPage": {
+                        "description": "LastPage is the identifier for the final page of results. This value will be null if there is not a previous result page.",
+                        "type": "integer",
+                        "format": "int32"
+                    },
+                    "nextPage": {
+                        "description": "NextPage is the identifier for the next page of results. This value will be null if there is not a next page of results.",
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "format": "int32"
+                    },
+                    "totalCount": {
+                        "description": "TotalCount is total number of domains returned for request.",
+                        "type": "integer",
+                        "format": "int32"
+                    }
+                },
+                "required": [
+                    "unverifiedContacts",
+                    "from",
+                    "to",
+                    "lastPage",
+                    "nextPage",
+                    "totalCount"
                 ]
             },
             "AccountCreditBalanceChange": {
@@ -8762,6 +9935,96 @@ export const EMBEDDED_SPEC = {
                         "description": "The remaining balance of account credit"
                     }
                 }
+            },
+            "DomainLockStatusChange": {
+                "type": "object",
+                "required": [
+                    "eventName",
+                    "domainName",
+                    "action",
+                    "lockType",
+                    "registryStatuses"
+                ],
+                "properties": {
+                    "eventName": {
+                        "type": "string",
+                        "enum": [
+                            "domain.lock.status_change"
+                        ]
+                    },
+                    "domainName": {
+                        "type": "string",
+                        "description": "Fully-qualified domain name",
+                        "example": "example.org"
+                    },
+                    "action": {
+                        "type": "string",
+                        "enum": [
+                            "added",
+                            "removed"
+                        ]
+                    },
+                    "lockType": {
+                        "type": "string",
+                        "description": "The lock type affected by this event (added or removed)",
+                        "enum": [
+                            "RegistrarLock",
+                            "TransferLock",
+                            "AccountLock",
+                            "ClientHold",
+                            "VerificationClientHold",
+                            "VerificationHold",
+                            "PrivacyLock"
+                        ]
+                    },
+                    "registryStatuses": {
+                        "type": "array",
+                        "description": "Current registry statuses after the change",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": [
+                            "clientHold",
+                            "clientTransferProhibited",
+                            "clientUpdateProhibited"
+                        ]
+                    }
+                }
+            },
+            "DomainTransferStatusChange": {
+                "type": "object",
+                "properties": {
+                    "eventName": {
+                        "type": "string",
+                        "description": "The name of the subscription event"
+                    },
+                    "domainName": {
+                        "type": "string",
+                        "description": "The domain that the transfer status has changed for"
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "The updated status of the domain transfer. The transfer status will be one of the following values:\n- **canceled:** The transfer has been canceled by the user.\n- **canceled_pending_refund**: The transfer has been canceled by the user, and a refund for the price is being processed.\n- **completed**: The transfer has completed.\n- **failed**: The transfer has failed, and will not be retried.\n- **pending**: The transfer has been requested, and is pending.\n- **pending_insert**: The transfer has completed and the domain will soon be inserted into the account.\n- **pending_new_auth_code**: A new authcode is required to complete the transfer.\n- **pending_transfer**: The transfer has been requested, and is pending.\n- **pending_unlock**: The domain to be transferred is currently in a locked state at the losing registrar, and will begin processing once the lock has been removed.\n- **rejected**: The transfer has been rejected at the losing registrar and will not be retried.\n- **submitting_transfer**: The transfer has been initiated and will soon be submitted to the registry.\n",
+                        "enum": [
+                            "canceled",
+                            "canceled_pending_refund",
+                            "completed",
+                            "failed",
+                            "pending",
+                            "pending_insert",
+                            "pending_new_auth_code",
+                            "pending_transfer",
+                            "pending_unlock",
+                            "rejected",
+                            "submitting_transfer"
+                        ]
+                    }
+                },
+                "required": [
+                    "eventName",
+                    "domainName",
+                    "status"
+                ]
             }
         }
     }

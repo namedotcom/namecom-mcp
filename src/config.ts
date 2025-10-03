@@ -79,6 +79,22 @@ export const DEFAULT_VALUES: Record<string, any> = {
   dir: 'asc'
 };
 
+// Centralized blacklist for operations to exclude from MCP server
+export const BLACKLISTED_OPERATIONS: string[] = [
+  // Contact verification operations
+  'UnverifiedContactsList',
+  'VerifyContact',
+  // Add other operations to exclude here
+  // 'SomeOtherOperation',
+];
+
+// Blacklisted tags (entire tag categories to exclude)
+export const BLACKLISTED_TAGS: string[] = [
+  'Contact Verification',
+  // Add other tags to exclude here
+  // 'SomeOtherTag',
+];
+
 // Server configuration
 export const SERVER_CONFIG = {
   name: "name.com API",
