@@ -18,9 +18,9 @@
     "test:coverage": "jest --coverage",
     "test:ci": "jest --ci --coverage --watchAll=false",
     "prepublishOnly": "npm run build && npm run test:ci",
-    "version:patch": "npm run build && npm run test:ci && npm version patch && git push upstream && git push upstream --tags",
-    "version:minor": "npm run build && npm run test:ci && npm version minor && git push upstream && git push upstream --tags",
-    "version:major": "npm run build && npm run test:ci && npm version major && git push upstream && git push upstream --tags",
+    "version:patch": "npm run build && npm run test:ci && npm version patch -m \"NCDD-000 chore(release): %s\" && git push upstream && git push upstream --tags",
+    "version:minor": "npm run build && npm run test:ci && npm version minor -m \"NCDD-000 chore(release): %s\" && git push upstream && git push upstream --tags",
+    "version:major": "npm run build && npm run test:ci && npm version major -m \"NCDD-000 chore(release): %s\" && git push upstream && git push upstream --tags",
     "release:patch": "npm run version:patch",
     "release:minor": "npm run version:minor",
     "release:major": "npm run version:major"
