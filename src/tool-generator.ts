@@ -3,7 +3,7 @@ import { z } from "zod";
 import { OpenApiOperation, OpenApiSpec } from "./types.js";
 import { loadOpenApiSpec, openApiSchemaToZod, resolveSchemaRef } from "./openapi-utils.js";
 import { callNameApi } from "./api-client.js";
-import { DEFAULT_VALUES } from "./config.js";
+import { DEFAULT_VALUES, BLACKLISTED_OPERATIONS, BLACKLISTED_TAGS } from "./config.js";
 
 /**
  * Helper functions to create the help and support tools
@@ -263,8 +263,18 @@ export async function createToolsFromSpec(server: McpServer): Promise<boolean> {
         continue;
       }
       
+      // Skip blacklisted operations
+      if (BLACKLISTED_OPERATIONS && BLACKLISTED_OPERATIONS.includes(operationId)) {
+        continue;
+      }
+      
       // Get the primary tag for this operation
       const tag = typedOperation.tags?.[0] || 'Other';
+      
+      // Skip blacklisted tags
+      if (BLACKLISTED_TAGS && BLACKLISTED_TAGS.includes(tag)) {
+        continue;
+      }
       
       if (!operationsByTag[tag]) {
         operationsByTag[tag] = [];
@@ -307,6 +317,9 @@ function analyzeOperation(method: string, path: string, operationId: string, ope
   if (opIdLower === 'getsubscribednotifications') return 'list';
   if (opIdLower === 'modifysubscription') return 'modify';
   if (opIdLower === 'deletesubscription') return 'delete';
+  
+  // Handle specific Zone Check operations
+  if (opIdLower === 'zonecheck') return 'check';
   
   // Dynamic pattern-based inference from operationId (most reliable)
   if (opIdLower.startsWith('list')) return 'list';
@@ -391,7 +404,11 @@ function createOperationDescriptions(tag: string, operations: ConsolidatedOperat
         if (opType === 'search') {
           guidance += ' For domain discovery: finds creative suggestions. Use TLDFilter only if a specific TLD/list is requested; ignore \`.\` in TLDs.';
         } else if (opType === 'check') {
-          guidance += ' Use ONLY for validating specific domains: checks exact domain availability. Use only when user asks about specific domains.';
+          if (op.operationId === 'ZoneCheck') {
+            guidance += ' Rapid batch domain availability check using cached zone files. Use for large-batch queries.';
+          } else {
+            guidance += ' Use ONLY for validating specific domains: checks exact domain availability. Use only when user asks about specific domains.';
+          }
         } else if (opType === 'create') {
           guidance += ' Creates a new domain. Use only when user asks to create. If contact info from other domains exists, use it. Otherwise, get and confirm contact info from user before purchasing; do not autofill fake contact information.';
         }
