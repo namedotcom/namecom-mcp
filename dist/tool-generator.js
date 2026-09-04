@@ -644,6 +644,17 @@ async function executeOperation(op, params, parameterTypes, originalPathMap) {
             }
         }
         const result = await callNameApi(apiPath, op.method.toUpperCase(), requestBody);
+        // A 204 carries no body, and `JSON.stringify(undefined)` returns undefined rather
+        // than a string. Rendering it puts a non-string where the MCP content schema requires
+        // text, so a successful delete arrives at the client as a malformed result.
+        if (result === undefined) {
+            return {
+                content: [{
+                        type: "text",
+                        text: `${op.operationId} succeeded. The API returned no content (HTTP 204).`
+                    }]
+            };
+        }
         // Special formatting for CheckAccountBalance to display currency properly
         if (op.operationId === 'CheckAccountBalance' && result && typeof result.balance === 'number') {
             return {
