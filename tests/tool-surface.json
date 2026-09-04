@@ -9,7 +9,7 @@
     "Hello": null,
     "ManageDNS": ["create", "delete", "get", "list", "update"],
     "ManageDNSSECs": ["create", "delete", "get", "list"],
-    "ManageDomains": ["check", "create", "get", "list", "purchaseprivacy", "renew", "search", "setContacts", "setNameservers", "update"],
+    "ManageDomains": ["check", "create", "get", "getAuthCodeForDomain", "getPricingForDomain", "list", "purchaseprivacy", "renew", "search", "setContacts", "setNameservers", "update", "zoneCheck"],
     "ManageEmailForwardings": ["create", "delete", "get", "list", "update"],
     "ManageOrders": ["get", "list"],
     "ManageTransfers": ["cancel", "create", "get", "list"],
