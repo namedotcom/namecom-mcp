@@ -126,7 +126,11 @@ try {
 
   console.log('\nreads that need no domain');
   await check('TLD price list', 'TldPriceList', {});
-  await check('premium domain lists', 'PremiumDomainLists', {});
+  // Not every account is entitled to the premium list. Confirmed against the API with no
+  // MCP code in the path: `hello` and the balance return 200 for the same credentials
+  // while this returns 403, so a refusal here is a property of the account rather than
+  // something this server did. Reported rather than counted as a failure.
+  await check('premium domain lists', 'PremiumDomainLists', {}, { allow: ['403'] });
   await check('domain search', 'ManageDomains', { operation: 'search', keyword: 'example' });
   // Arrays of scalars are published as a comma-separated string, not a JSON array. That
   // is how this generator has always exposed them; passing a real array is rejected by
@@ -190,8 +194,14 @@ try {
       await check('read it back by id', 'ManageURLForwardings', {
         operation: 'get', domainName: domain, id
       });
+      // `type` is sent even though only the target is being changed: the spec declares no
+      // required fields on this PATCH, but the API rejects a body without `type` with
+      // "'type' can't be null". Verified directly against the API. The discrepancy is
+      // upstream in the spec, so the tool cannot know to ask for it, and a partial update
+      // will fail until the spec is corrected.
       await check('update it by id', 'ManageURLForwardings', {
-        operation: 'update', domainName: domain, id, forwardsTo: 'https://www.name.com/about'
+        operation: 'update', domainName: domain, id,
+        forwardsTo: 'https://www.name.com/about', type: 'redirect'
       });
       const deleted = await check('delete it by id', 'ManageURLForwardings', {
         operation: 'delete', domainName: domain, id
