@@ -54,13 +54,13 @@
     "env.example"
   ],
   "engines": {
-    "node": ">=17.0.0"
+    "node": ">=20.0.0"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.8.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "dotenv": "^16.4.7",
-    "js-yaml": "^4.1.0",
-    "undici": "^5.29.0"
+    "js-yaml": "^4.3.2",
+    "undici": "^6.28.1"
   },
   "devDependencies": {
     "@types/jest": "^29.5.12",

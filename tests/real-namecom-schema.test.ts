@@ -248,14 +248,14 @@ describe('Real name.com Schema Tests', () => {
         const [toolName, parameters] = call;
         
         for (const [paramName, zodSchema] of Object.entries(parameters)) {
-          const schemaType = (zodSchema as any)._def?.typeName;
-          
           if (paramName.includes('domain_domainName')) {
             // Domain name should typically be required
             foundRequiredFields = true;
           }
-          
-          if (schemaType === 'ZodOptional') {
+
+          // `isOptional()` rather than the shape of `_def`: the public method means the
+          // same thing across zod majors, the internal field does not.
+          if ((zodSchema as z.ZodTypeAny).isOptional()) {
             foundOptionalFields = true;
           }
         }

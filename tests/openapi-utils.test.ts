@@ -247,7 +247,7 @@ describe('OpenAPI Schema Resolution and Conversion', () => {
       const zodSchema = openApiSchemaToZod(schema, false);
       
       expect(zodSchema).toBeInstanceOf(z.ZodOptional);
-      expect(zodSchema._def.innerType).toBeInstanceOf(z.ZodString);
+      expect((zodSchema as z.ZodOptional<z.ZodTypeAny>).unwrap()).toBeInstanceOf(z.ZodString);
     });
 
     it('should convert required string schema', () => {
@@ -279,7 +279,7 @@ describe('OpenAPI Schema Resolution and Conversion', () => {
       
       const zodSchema = openApiSchemaToZod(schema, false);
       expect(zodSchema).toBeInstanceOf(z.ZodOptional);
-      expect(zodSchema._def.innerType).toBeInstanceOf(z.ZodObject);
+      expect((zodSchema as z.ZodOptional<z.ZodTypeAny>).unwrap()).toBeInstanceOf(z.ZodObject);
     });
 
     it('should convert array schema', () => {
@@ -290,7 +290,7 @@ describe('OpenAPI Schema Resolution and Conversion', () => {
       
       const zodSchema = openApiSchemaToZod(schema, false);
       expect(zodSchema).toBeInstanceOf(z.ZodOptional);
-      expect(zodSchema._def.innerType).toBeInstanceOf(z.ZodArray);
+      expect((zodSchema as z.ZodOptional<z.ZodTypeAny>).unwrap()).toBeInstanceOf(z.ZodArray);
     });
 
     it('should resolve $ref before converting to Zod', () => {
@@ -300,7 +300,7 @@ describe('OpenAPI Schema Resolution and Conversion', () => {
       
       const zodSchema = openApiSchemaToZod(schema, false);
       expect(zodSchema).toBeInstanceOf(z.ZodOptional);
-      expect(zodSchema._def.innerType).toBeInstanceOf(z.ZodObject);
+      expect((zodSchema as z.ZodOptional<z.ZodTypeAny>).unwrap()).toBeInstanceOf(z.ZodObject);
     });
 
     it('should handle enum schemas', () => {
@@ -311,7 +311,7 @@ describe('OpenAPI Schema Resolution and Conversion', () => {
       
       const zodSchema = openApiSchemaToZod(schema, false);
       expect(zodSchema).toBeInstanceOf(z.ZodOptional);
-      expect(zodSchema._def.innerType).toBeInstanceOf(z.ZodEnum);
+      expect((zodSchema as z.ZodOptional<z.ZodTypeAny>).unwrap()).toBeInstanceOf(z.ZodEnum);
     });
   });
 
@@ -464,7 +464,7 @@ describe('OpenAPI Schema Resolution and Conversion', () => {
 
       const zodSchema = openApiSchemaToZod(schema, false);
       expect(zodSchema).toBeInstanceOf(z.ZodOptional);
-      expect(zodSchema._def.innerType).toBeInstanceOf(z.ZodObject);
+      expect((zodSchema as z.ZodOptional<z.ZodTypeAny>).unwrap()).toBeInstanceOf(z.ZodObject);
     });
 
     it('should handle schema with additionalProperties', () => {
@@ -475,7 +475,7 @@ describe('OpenAPI Schema Resolution and Conversion', () => {
 
       const zodSchema = openApiSchemaToZod(schema, false);
       expect(zodSchema).toBeInstanceOf(z.ZodOptional);
-      expect(zodSchema._def.innerType).toBeInstanceOf(z.ZodObject);
+      expect((zodSchema as z.ZodOptional<z.ZodTypeAny>).unwrap()).toBeInstanceOf(z.ZodObject);
     });
 
     it('should handle empty allOf array', () => {
