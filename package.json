@@ -17,6 +17,7 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:ci": "jest --ci --coverage --watchAll=false",
+    "smoke": "node scripts/smoke.mjs",
     "prepublishOnly": "npm run build && npm run test:ci",
     "version": "npm run build && git add src/version.ts dist",
     "version:patch": "npm run build && npm run test:ci && npm version patch -m \"NCDD-000 chore(release): %s\" && git push upstream && git push upstream --tags",
