@@ -67,11 +67,17 @@ export const PUBLISHED_OPERATION_NAMES: Readonly<Record<string, string>> = {
   CancelTransfer: 'cancel',
 
   // URL Forwardings
-  ListURLForwardings: 'list',
+  //
+  // The four operations keyed by `{host}` were deprecated upstream and replaced by
+  // variants keyed by `{id}`. The successors inherit the retired names, so a caller keeps
+  // writing `operation: "list"` and what changes is that it now passes an id instead of a
+  // host. Moving a published name onto a different operation is only defensible because
+  // the endpoint behind it was withdrawn, not because a different one looked tidier.
   CreateURLForwarding: 'create',
-  GetURLForwarding: 'get',
-  UpdateURLForwarding: 'update',
-  DeleteURLForwarding: 'delete',
+  ListURLForwardingsByDomain: 'list',
+  GetURLForwardingById: 'get',
+  UpdateURLForwardingById: 'update',
+  DeleteURLForwardingById: 'delete',
 
   // Vanity Nameservers
   ListVanityNameservers: 'list',

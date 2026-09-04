@@ -1,22 +1,23 @@
 {
-  "spec": "1.7.0",
+  "spec": "1.33.5",
   "tools": {
     "CheckAccountBalance": null,
     "GetFeedbackLinks": null,
     "GetHelpResources": null,
-    "GetRequirement": null,
     "GetTroubleshootingInfo": null,
     "Hello": null,
     "ManageDNS": ["create", "delete", "get", "list", "update"],
     "ManageDNSSECs": ["create", "delete", "get", "list"],
+    "ManageDomainInfo": ["check", "getRequirement", "getTldRequirementsV2"],
     "ManageDomains": ["check", "create", "get", "getAuthCodeForDomain", "getPricingForDomain", "list", "purchaseprivacy", "renew", "search", "setContacts", "setNameservers", "update", "zoneCheck"],
     "ManageEmailForwardings": ["create", "delete", "get", "list", "update"],
     "ManageOrders": ["get", "list"],
-    "ManageTransfers": ["cancel", "create", "get", "list"],
+    "ManageTransfers": ["cancel", "cancelOutboundTransfer", "create", "createInternalTransferIn", "get", "getTransferEligibility", "list"],
     "ManageURLForwardings": ["create", "delete", "get", "list", "update"],
     "ManageVanityNameservers": ["create", "delete", "get", "list", "update"],
     "ManageWebhookNotifications": ["create", "delete", "list", "modify"],
     "PremiumDomainLists": null,
+    "ProcessRefund": null,
     "TldPriceList": null
   }
 }
