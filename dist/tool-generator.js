@@ -2,6 +2,7 @@ import { z } from "zod";
 import { loadOpenApiSpec, openApiSchemaToZod, resolveSchemaRef } from "./openapi-utils.js";
 import { callNameApi } from "./api-client.js";
 import { DEFAULT_VALUES, BLACKLISTED_OPERATIONS, BLACKLISTED_TAGS } from "./config.js";
+import { assignOperationNames } from "./operation-keys.js";
 /**
  * Helper functions to create the help and support tools
  */
@@ -323,47 +324,36 @@ function analyzeOperation(method, path, operationId, operation) {
     }
 }
 /**
- * Create operation descriptions using OpenAPI metadata
+ * Describe each operation of a consolidated tool, in the order the tag declares them.
+ *
+ * One entry per operation, because every operation now has a name of its own. The old
+ * version grouped by name and dropped the guidance whenever two operations shared one,
+ * which is why the batch-availability advice below was unreachable text.
  */
-function createOperationDescriptions(tag, operations, uniqueOperations) {
+function createOperationDescriptions(tag, operations, operationNames) {
     const operationDetails = [];
-    for (const opType of uniqueOperations) {
-        const matchingOps = operations.filter(op => analyzeOperation(op.method, op.path, op.operationId, op.operation) === opType);
-        if (matchingOps.length === 1) {
-            const op = matchingOps[0];
-            const summary = op.operation.summary || op.operationId;
-            const description = op.operation.description ?
-                op.operation.description.split('.')[0] + '.' : '';
-            // Add specific guidance for various domain functionality
-            let guidance = ' - Parameter names must be used exactly as listed (e.g., `domain_domainName`). Do not modify or simplify.';
-            if (tag.toLowerCase() === 'domains') {
-                if (opType === 'search') {
-                    guidance += ' For domain discovery: finds creative suggestions. Use TLDFilter only if a specific TLD/list is requested; ignore \`.\` in TLDs.';
-                }
-                else if (opType === 'check') {
-                    if (op.operationId === 'ZoneCheck') {
-                        guidance += ' Rapid batch domain availability check using cached zone files. Use for large-batch queries.';
-                    }
-                    else {
-                        guidance += ' Use ONLY for validating specific domains: checks exact domain availability. Use only when user asks about specific domains.';
-                    }
-                }
-                else if (opType === 'create') {
-                    guidance += ' Creates a new domain. Use only when user asks to create. If contact info from other domains exists, use it. Otherwise, get and confirm contact info from user before purchasing; do not autofill fake contact information.';
-                }
+    for (const op of operations) {
+        const opType = operationNames.get(op.operationId);
+        const summary = op.operation.summary || op.operationId;
+        const description = op.operation.description ?
+            op.operation.description.split('.')[0] + '.' : '';
+        // Add specific guidance for various domain functionality
+        let guidance = ' - Parameter names must be used exactly as listed (e.g., `domain_domainName`). Do not modify or simplify.';
+        if (tag.toLowerCase() === 'domains') {
+            if (opType === 'search') {
+                guidance += ' For domain discovery: finds creative suggestions. Use TLDFilter only if a specific TLD/list is requested; ignore \`.\` in TLDs.';
             }
-            operationDetails.push(`${opType}: ${summary}${description ? ' - ' + description : ''}${guidance}`);
+            else if (op.operationId === 'ZoneCheck') {
+                guidance += ' Rapid batch domain availability check using cached zone files. Use for large-batch queries.';
+            }
+            else if (op.operationId === 'CheckAvailability') {
+                guidance += ' Use ONLY for validating specific domains: checks exact domain availability. Use only when user asks about specific domains.';
+            }
+            else if (opType === 'create') {
+                guidance += ' Creates a new domain. Use only when user asks to create. If contact info from other domains exists, use it. Otherwise, get and confirm contact info from user before purchasing; do not autofill fake contact information.';
+            }
         }
-        else if (matchingOps.length > 0) {
-            // Use the first operation's summary as representative
-            const op = matchingOps[0];
-            const summary = op.operation.summary || `${opType} operations`;
-            operationDetails.push(`${opType}: ${summary}`);
-        }
-        else {
-            // Fallback for operations without matches
-            operationDetails.push(`${opType}: ${opType} operations for ${tag.toLowerCase()}`);
-        }
+        operationDetails.push(`${opType}: ${summary}${description ? ' - ' + description : ''}${guidance}`);
     }
     return `The operation to perform. Options:\n${operationDetails.join('\n')}`;
 }
@@ -419,8 +409,8 @@ async function createConsolidatedTool(server, tag, operations) {
         return;
     }
     // For multi-operation tags, create consolidated tool
-    const operationEnum = operations.map(op => analyzeOperation(op.method, op.path, op.operationId, op.operation)).filter(Boolean);
-    const uniqueOperations = [...new Set(operationEnum)];
+    const operationNames = assignOperationNames(operations, op => analyzeOperation(op.method, op.path, op.operationId, op.operation));
+    const uniqueOperations = operations.map(op => operationNames.get(op.operationId));
     if (uniqueOperations.length === 0) {
         // Fallback to individual tools if we can't infer operations
         for (const op of operations) {
@@ -429,7 +419,7 @@ async function createConsolidatedTool(server, tag, operations) {
         return;
     }
     // Build operation descriptions with specific guidance
-    const operationDescriptions = createOperationDescriptions(tag, operations, uniqueOperations);
+    const operationDescriptions = createOperationDescriptions(tag, operations, operationNames);
     // Build consolidated parameter schema
     const params = {
         operation: z.enum([uniqueOperations[0], ...uniqueOperations.slice(1)])
@@ -446,7 +436,7 @@ async function createConsolidatedTool(server, tag, operations) {
     }
     // Collect operation-specific parameters
     for (const op of operations) {
-        const opType = analyzeOperation(op.method, op.path, op.operationId, op.operation);
+        const opType = operationNames.get(op.operationId);
         const { params: opParams } = await extractOperationParameters(op);
         // Check each parameter's requirements for this operation
         for (const [paramName, paramSchema] of Object.entries(opParams)) {
@@ -497,7 +487,7 @@ async function createConsolidatedTool(server, tag, operations) {
     server.tool(toolName, params, async (toolParams) => {
         const { operation: requestedOperation, ...otherParams } = toolParams;
         // Find the matching operation
-        const matchingOp = operations.find(op => analyzeOperation(op.method, op.path, op.operationId, op.operation) === requestedOperation);
+        const matchingOp = operations.find(op => operationNames.get(op.operationId) === requestedOperation);
         if (!matchingOp) {
             return {
                 isError: true,
@@ -654,6 +644,17 @@ async function executeOperation(op, params, parameterTypes, originalPathMap) {
             }
         }
         const result = await callNameApi(apiPath, op.method.toUpperCase(), requestBody);
+        // A 204 carries no body, and `JSON.stringify(undefined)` returns undefined rather
+        // than a string. Rendering it puts a non-string where the MCP content schema requires
+        // text, so a successful delete arrives at the client as a malformed result.
+        if (result === undefined) {
+            return {
+                content: [{
+                        type: "text",
+                        text: `${op.operationId} succeeded. The API returned no content (HTTP 204).`
+                    }]
+            };
+        }
         // Special formatting for CheckAccountBalance to display currency properly
         if (op.operationId === 'CheckAccountBalance' && result && typeof result.balance === 'number') {
             return {

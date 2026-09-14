@@ -5,12 +5,12 @@ export const EMBEDDED_SPEC = {
   "openapi": "3.1.0",
   "info": {
     "contact": {
-      "email": "accountservices@name.com",
-      "name": "Account Services"
+      "email": "reseller@name.com",
+      "name": "Reseller Account Services"
     },
-    "description": "RESTful API for managing domains, DNS records, and related services at name.com.  Access via HTTPS at api.name.com (production) or api.dev.name.com (testing).  Supports standard authentication, rate-limited to 20 requests/second. ",
+    "description": "RESTful API for managing domains, DNS records, and related services at name.com.  Access via HTTPS at api.name.com (production) or api.dev.name.com (testing).  Supports standard authentication, rate-limited to 20 requests/second.",
     "title": "name.com Core API",
-    "version": "1.7.0",
+    "version": "1.33.6",
     "termsOfService": "https://www.name.com/policies/api-access-agreement"
   },
   "servers": [
@@ -67,15 +67,19 @@ export const EMBEDDED_SPEC = {
     },
     {
       "name": "Transfers",
-      "description": "Use Transfers endpoints to move domains into your name.com account. Start by creating a transfer request, then monitor and manage the status of pending transfers. You can also cancel a transfer if needed."
+      "description": "Use Transfers endpoints to move domains into your name.com account. Start by creating a transfer request for inbound transfers from **external** registrars, then monitor and manage the status of pending transfers. Use **internal transfer in** to pull a domain from another name.com account into your reseller account (enterprise allowlist; requires auth code from the losing account’s dashboard). You can cancel an incoming transfer if needed, or cancel an outbound transfer (domain leaving name.com) via the external transfer-out cancel endpoint. Use the **transfer eligibility** endpoint to check whether a domain is currently at name.com before initiating a transfer, so you can route to the correct flow (external vs internal transfer)."
     },
     {
       "name": "Orders",
       "description": "Use Orders endpoints to review and track purchases made via the API."
     },
     {
+      "name": "Refunds",
+      "description": "Use the Refunds endpoint to delete eligible domains and advanced security products during the Add Grace Period (AGP) and automatically issue refunds for the associated order items. You can use the List Orders endpoint to retrieve order IDs, then pass those IDs into the Refunds endpoint to process eligible deletions and refunds.   This endpoint enforces AGP delete limits and supports only domain registrations and advanced security add-ons. Refunds are issued  to the original payment method on file. If the original payment method is unavailable, the refund will be credited to the account balance.\n"
+    },
+    {
       "name": "Webhook Notifications",
-      "description": "Use Webhook Notification endpoints to subscribe to real-time notifications for account and domain events. This keeps your application updated on important changes without polling the API."
+      "description": "Use Webhook Notification endpoints to subscribe to real-time notifications for account and domain events. This keeps your application updated on important changes without polling the API.\nOutbound webhook POSTs include an `X-NAMECOM-SIGNATURE` header. HMAC uses one API v4 token per account, chosen deterministically when multiple tokens exist (see HMAC Signature Verification in the developer docs). The signing input format is unchanged.\n"
     },
     {
       "name": "Domain Info",
@@ -107,11 +111,69 @@ export const EMBEDDED_SPEC = {
             "description": "A successful response."
           },
           "401": {
-            "description": "You are attempting to make an API request with invalid credentials.",
+            "description": "Unauthorized.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Unauthorized401"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
                 }
               }
             }
@@ -121,7 +183,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -136,11 +209,97 @@ export const EMBEDDED_SPEC = {
             }
           },
           "500": {
-            "description": "Internal server error occurred.",
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -193,17 +352,65 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Unauthorized401"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
                 }
               }
             }
           },
           "403": {
-            "description": "Only authorized accounts have access to this endpoint. To request access, please contact our support team.",
+            "description": "Forbidden - you do not have permission to perform this action.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericForbidden403"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
                 }
               }
             }
@@ -223,7 +430,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -233,6 +451,102 @@ export const EMBEDDED_SPEC = {
                 "schema": {
                   "type": "number",
                   "example": 1747668270
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -250,13 +564,18 @@ export const EMBEDDED_SPEC = {
         "operationId": "ListDomains",
         "parameters": [
           {
-            "description": "Per Page is the number of records to return per request. Per Page defaults to 1,000.",
+            "description": "Per Page is the number of records to return per request. Per Page defaults to 250.",
             "in": "query",
             "name": "perPage",
             "schema": {
-              "format": "int32",
-              "type": "integer",
-              "default": 1000
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/PerPageLimit"
+                },
+                {
+                  "default": 250
+                }
+              ]
             }
           },
           {
@@ -265,7 +584,8 @@ export const EMBEDDED_SPEC = {
             "name": "page",
             "schema": {
               "format": "int32",
-              "type": "integer"
+              "type": "integer",
+              "minimum": 1
             }
           },
           {
@@ -388,6 +708,15 @@ export const EMBEDDED_SPEC = {
               "format": "int32",
               "type": "integer"
             }
+          },
+          {
+            "description": "IncludeRenewalPrice indicates whether to include renewal pricing information in the response.",
+            "in": "query",
+            "name": "includeRenewalPrice",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            }
           }
         ],
         "responses": {
@@ -421,11 +750,69 @@ export const EMBEDDED_SPEC = {
             }
           },
           "401": {
-            "description": "You are attempting to make an API request with invalid credentials.",
+            "description": "Unauthorized.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Unauthorized401"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
                 }
               }
             }
@@ -435,7 +822,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -450,11 +848,97 @@ export const EMBEDDED_SPEC = {
             }
           },
           "500": {
-            "description": "An error has occurred on the server.",
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -466,7 +950,7 @@ export const EMBEDDED_SPEC = {
         ]
       },
       "post": {
-        "description": "Registers a new domain under your account. You must provide the `domain.domainName` at a bare minimum to register. \nFor premium or special-priced domains, the purchase_price must also be included to confirm cost. \nThis endpoint is commonly used to programmatically onboard new domains through user signup flows or checkout experiences.\n\nIf no contacts are passed in this request, the default contacts for your name.com account will be used.\n\n### Best Practices For Domain Creates\n\nIn general, you should check that a domain is available prior to attempting to purchase a domain. \nYou can use either the [checkAvailability](#operation/CheckAvailability) endpoint, or the [Search](#operation/Search) endpoint\nto confirm that a domain is purchasable.\n\n#### Important Note on Dropcatching and Abuse Prevention\n\n_The createDomain endpoint is designed for standard domain registrations and is not intended for automated dropcatching (i.e., mass or high-frequency attempts to register domains the moment they become available after expiration). The use of drop-catching tools or services to acquire expired domains is strictly prohibited. All domain acquisitions must go through approved channels to ensure fair and transparent access._\n\n#### Contact Verification\nWhen a new domain registration is created and a contact is submitted, name.com may need to validate the contact's email address in accordance with ICANN policy. This validation involves sending an email to the provided address, prompting the recipient to click a link to verify their email address.\n",
+        "description": "Registers a new domain under your account. You must provide `domain.domainName` at minimum.\nThis endpoint is commonly used to programmatically onboard new domains through user signup flows or checkout experiences.\n\nIf no contacts are passed in this request, the default contacts for your name.com account will be used.\n\n### Create Domain pricing\n\nSee the [Domain purchase pricing guide](/guides/domain-pricing) for the full reference.\n**Recommendation:** For most integrations, scope discovery to `purchaseType: registration`. Other purchase types are supported but add complexity — details in the guide above.\n\n**Discovery (required before create):** Call [Search](/api/v1/reference/domains/search) or [Check Availability](/api/v1/reference/domains/check-availability), not Get Pricing alone. Both return the same `SearchResult` fields (`purchaseType`, `purchasePrice`, `premium`, `purchasable`). [Zone Check](/api/v1/reference/domains/zone-check) is designed for rapid availability checks only; it is not sufficient to complete a purchase.\n\n### Getting the price for Create Domain\n\n1. **Search or Check Availability** → copy `purchaseType`, `premium`, note `purchasePrice`.\n\n2. Branch on `purchaseType`:\n   - **`registration` + `premium: false`** — omit `purchasePrice` on create, set `years`. Optional: Get Pricing with same `years` to preview the total.\n   - **`registration` + `premium: true`** — Get Pricing with same `years` → pass `purchasePrice` exactly.\n   - **aftermarket / expiring / backorder** — use discovery `purchasePrice` (flat fee). Re-check discovery before create. Do not use Get Pricing for create price. `years` does not multiply price or guarantee registration length.\n\n3. If `purchasePrice` is sent, it must match exactly or the request fails with `400` and `\"Purchase price does not match\"`.\n\n**Years on acquisition types:** For `aftermarket_s`, `aftermarket_b`, `aftermarket_i`, `expiring`, and `backorder`: omit `years` or pass the TLD default. Check `domain.expireDate` in the response; [Renew](/api/v1/reference/domains/renew-domain) to extend registration.\n\n### Best Practices For Domain Creates\n\nIn general, you should check that a domain is available prior to attempting to purchase a domain.\nYou can use either the [checkAvailability](/api/v1/reference/domains/check-availability) endpoint, or the [Search](/api/v1/reference/domains/search) endpoint\nto confirm that a domain is purchasable.\n\n#### Important Note on Dropcatching and Abuse Prevention\n\n_The createDomain endpoint is designed for standard domain registrations and is not intended for automated dropcatching (i.e., mass or high-frequency attempts to register domains the moment they become available after expiration). The use of drop-catching tools or services to acquire expired domains is strictly prohibited. All domain acquisitions must go through approved channels to ensure fair and transparent access._\n\n#### Contact Verification\nWhen a new domain registration is created and a contact is submitted, name.com may need to validate the contact's email address in accordance with ICANN policy. This validation involves sending an email to the provided address, prompting the recipient to click a link to verify their email address.\n",
         "operationId": "CreateDomain",
         "parameters": [
           {
@@ -497,8 +981,8 @@ export const EMBEDDED_SPEC = {
                   }
                 },
                 "multipleYears": {
-                  "summary": "Creating a domain for multiple years.",
-                  "description": "To purchase a domain for more than the default minimum for a TLD, just add \"years\" to the request.",
+                  "summary": "Standard registration, 2 years (omit purchasePrice).",
+                  "description": "For `purchaseType: registration` with `premium: false`, omit `purchasePrice` and set `years` on create. Optionally call Get Pricing with `years=2` to preview the registration total.",
                   "value": {
                     "domain": {
                       "domainName": "example.com"
@@ -506,27 +990,63 @@ export const EMBEDDED_SPEC = {
                     "years": 2
                   }
                 },
-                "premiumPurchase": {
-                  "summary": "Creating a premium domain",
-                  "description": "To create a premium domain, the `purchasePrice` and `purchaseType` parameters are required",
+                "registryPremium": {
+                  "summary": "Registry premium domain, 1 year.",
+                  "description": "Registry premium uses `purchaseType: registration` with `premium: true` from Search or Check Availability. Call Get Pricing with matching `years` and pass `purchasePrice` exactly.",
                   "value": {
                     "domain": {
                       "domainName": "premiumexample.com"
                     },
                     "purchasePrice": 349.95,
-                    "purchaseType": "expiring"
+                    "purchaseType": "registration",
+                    "years": 1
                   }
                 },
                 "premiumPurchaseMultiYear": {
-                  "summary": "Creating a premium domain for multiple years",
-                  "description": "To create a premium domain for multiple years, the `purchasePrice`, `purchaseType` and `years` parameters are required. You will need to get the single year pricing, and then multiply the single year pricing by the number of years you wish to purchase the domain for. Example: 1 year pricing = 349.95. 2 year pricing = 699.90",
+                  "summary": "Registry premium domain, 2 years (from Get Pricing).",
+                  "description": "For registry premium multi-year, call Get Pricing with `years=2` and pass the returned `purchasePrice` total. Example: flat $349.95/yr registry premium → `purchasePrice: 699.90` for 2 years. Do not use discovery `renewalPrice` or multiply aftermarket acquisition fees by years.",
                   "value": {
                     "domain": {
                       "domainName": "premiumexample.com"
                     },
                     "purchasePrice": 699.9,
-                    "purchaseType": "expiring",
+                    "purchaseType": "registration",
                     "years": 2
+                  }
+                },
+                "aftermarketFlatPrice": {
+                  "summary": "Aftermarket domain — flat acquisition fee.",
+                  "description": "Aftermarket domains use a flat acquisition fee from Search or Check Availability — not Get Pricing. `purchasePrice: 5000.00` is the acquisition fee only; it does not buy multiple years. Omit `years` or pass the TLD default — it does not affect price or guarantee registration length.",
+                  "value": {
+                    "domain": {
+                      "domainName": "rarename.com"
+                    },
+                    "purchasePrice": 5000,
+                    "purchaseType": "aftermarket_s",
+                    "years": 1
+                  }
+                },
+                "expiringPurchase": {
+                  "summary": "Expiring domain (non-registration purchaseType).",
+                  "description": "Expiring domains use a flat acquisition fee from discovery — not Get Pricing. Pass discovery `purchasePrice` with matching `purchaseType`. Omit `years` or pass the TLD default — it does not affect price or guarantee registration length.",
+                  "value": {
+                    "domain": {
+                      "domainName": "expiringexample.com"
+                    },
+                    "purchasePrice": 349.95,
+                    "purchaseType": "expiring",
+                    "years": 1
+                  }
+                },
+                "backorderPurchase": {
+                  "summary": "Backorder domain (non-registration purchaseType).",
+                  "description": "Backorder domains use a flat TLD-based acquisition fee from discovery — not Get Pricing. Pass discovery `purchasePrice` with matching `purchaseType`. `purchasePrice` is required regardless of the `premium` flag. Omit `years` or pass the TLD default — it does not affect price or guarantee registration length. Re-check Check Availability immediately before create — prices can change. Example price below is illustrative — use the value from your discovery result.",
+                  "value": {
+                    "domain": {
+                      "domainName": "backorderexample.com"
+                    },
+                    "purchasePrice": 79.99,
+                    "purchaseType": "backorder"
                   }
                 },
                 "singleContactAtCreate": {
@@ -565,11 +1085,37 @@ export const EMBEDDED_SPEC = {
                     },
                     "years": 1
                   }
+                },
+                "cctldRequirements": {
+                  "summary": "Registering a .se domain with TLD requirements",
+                  "description": "Some ccTLDs require additional registry-specific fields at create time. Fetch the required keys from [Get TLD Requirements as JSON Schema](/api/v1/reference/domain-info/get-specific-tld-requirements-v2), then pass them under `tldRequirements`. For `.se`, `X-NICSE-IDNUMBER` is required (personal or organizational ID).",
+                  "value": {
+                    "domain": {
+                      "domainName": "example.se"
+                    },
+                    "tldRequirements": {
+                      "X-NICSE-IDNUMBER": "5566778899"
+                    },
+                    "years": 1
+                  }
+                },
+                "withClaims": {
+                  "summary": "Creating a domain with trademark claims acknowledgment",
+                  "description": "When a domain has trademark claims (as determined by the [Domain Claims Check](/api/v1/reference/domain-info/check-domain-claims) endpoint), you must include the claims acknowledgment data in the domain creation request. This includes the claim identifier and validity dates from the claims check response.",
+                  "value": {
+                    "domain": {
+                      "domainName": "tiktok.page"
+                    },
+                    "claims": {
+                      "claimId": "8c3027d30000000000382500785",
+                      "notBefore": "2020-01-01T00:00:00Z",
+                      "notAfter": "2030-01-01T00:00:00Z"
+                    }
+                  }
                 }
               }
             }
           },
-          "description": "CreateDomainRequest has the information that is needed to create a domain with the CreateDomain function.",
           "required": true
         },
         "responses": {
@@ -583,7 +1129,7 @@ export const EMBEDDED_SPEC = {
                 }
               },
               "X-Idempotent-Replay": {
-                "description": "Indicates that the response is being replayed from an idempotent request. This header will only be returned if the API is responding with cached data. Caches are cleared after 12 hours.",
+                "description": "Indicates that the response is being replayed from an idempotent request. This header will only be returned if the API is responding with cached data. Caches are cleared after 1 hour.",
                 "schema": {
                   "type": "number",
                   "example": 1
@@ -610,15 +1156,25 @@ export const EMBEDDED_SPEC = {
                   "premiumPriceRequired": {
                     "summary": "Premium domain purchase requires price",
                     "value": {
-                      "message": "Invalid argument",
-                      "details": "Purchase price is required for premium domains in order to complete this request"
+                      "message": "Purchase price is required for premium domains in order to complete this request"
                     }
                   },
                   "priceRequired": {
-                    "summary": "Purchase price required",
+                    "summary": "Purchase price required (non-registration purchaseType)",
                     "value": {
-                      "message": "Invalid argument",
-                      "details": "Purchase price is required in order to complete this request"
+                      "message": "Purchase price is required in order to complete this request"
+                    }
+                  },
+                  "priceMismatch": {
+                    "summary": "Purchase price does not match",
+                    "value": {
+                      "message": "Purchase price does not match"
+                    }
+                  },
+                  "invalidYears": {
+                    "summary": "Invalid registration term",
+                    "value": {
+                      "message": "Invalid years"
                     }
                   }
                 }
@@ -626,11 +1182,21 @@ export const EMBEDDED_SPEC = {
             }
           },
           "401": {
-            "description": "Failure creating domain.",
+            "description": "Unauthorized.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Unauthorized401"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
                 }
               }
             }
@@ -645,12 +1211,60 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "404": {
             "description": "Domain or requested resource not found.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
                 }
               }
             }
@@ -705,7 +1319,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -719,12 +1344,40 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
+          "451": {
+            "description": "Unavailable for Legal Reasons.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnavailableForLegal451"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
                 }
               }
             }
@@ -735,6 +1388,74 @@ export const EMBEDDED_SPEC = {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/GenericError501"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -778,7 +1499,75 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Unauthorized401"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested domain could not be located.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
                 }
               }
             }
@@ -788,7 +1577,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -807,7 +1607,93 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -841,6 +1727,8 @@ export const EMBEDDED_SPEC = {
             "application/json": {
               "schema": {
                 "type": "object",
+                "description": "Fields for updating a domain. At least one of `autorenewEnabled`, `privacyEnabled`, or `locked` is required. Omit a property to leave it unchanged.",
+                "minProperties": 1,
                 "properties": {
                   "autorenewEnabled": {
                     "type": "boolean",
@@ -918,6 +1806,26 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "403": {
             "description": "The domain you are attempting to update has expired.",
             "content": {
@@ -934,6 +1842,26 @@ export const EMBEDDED_SPEC = {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
                 }
               }
             }
@@ -963,7 +1891,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -978,11 +1917,97 @@ export const EMBEDDED_SPEC = {
             }
           },
           "500": {
-            "description": "An error occurred on the server.",
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -1016,12 +2041,50 @@ export const EMBEDDED_SPEC = {
             },
             "description": "A successful response."
           },
-          "403": {
-            "description": "Failure listing DNSSECs at registry.",
+          "401": {
+            "description": "Unauthorized.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericForbidden403"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
                 }
               }
             }
@@ -1036,12 +2099,43 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limit has been exceeded.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -1060,7 +2154,93 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -1119,12 +2299,50 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
-          "403": {
-            "description": "Failure creating DNSSEC at registry.",
+          "401": {
+            "description": "Unauthorized.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericForbidden403"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
                 }
               }
             }
@@ -1135,6 +2353,36 @@ export const EMBEDDED_SPEC = {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict - A DNSSEC record with this digest already exists for the domain.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericConflict409"
                 }
               }
             }
@@ -1154,7 +2402,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -1169,11 +2428,97 @@ export const EMBEDDED_SPEC = {
             }
           },
           "500": {
-            "description": "An error occurred on the server.",
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -1213,6 +2558,54 @@ export const EMBEDDED_SPEC = {
           "204": {
             "description": "DNSSEC successfully deleted."
           },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "404": {
             "description": "Domain or DNSSEC not found.",
             "content": {
@@ -1223,12 +2616,43 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limit has been exceeded.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -1243,11 +2667,97 @@ export const EMBEDDED_SPEC = {
             }
           },
           "500": {
-            "description": "An error occurred on the server.",
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -1292,6 +2802,54 @@ export const EMBEDDED_SPEC = {
             },
             "description": "A successful response."
           },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "404": {
             "description": "Domain or DNSSEC not found.",
             "content": {
@@ -1302,12 +2860,43 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limit has been exceeded.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -1322,11 +2911,97 @@ export const EMBEDDED_SPEC = {
             }
           },
           "500": {
-            "description": "An error occurred on the server.",
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -1353,13 +3028,19 @@ export const EMBEDDED_SPEC = {
             }
           },
           {
-            "description": "(optional) Per Page is the number of records to return per request. Per Page defaults to 1,000 if not set.",
+            "description": "(optional) Per Page is the number of records to return per request. Per Page defaults to 500 if not set.",
             "in": "query",
             "name": "perPage",
             "schema": {
-              "format": "int32",
-              "type": "integer",
-              "example": 100
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/PerPageLimit"
+                },
+                {
+                  "default": 500,
+                  "example": 100
+                }
+              ]
             }
           },
           {
@@ -1369,7 +3050,8 @@ export const EMBEDDED_SPEC = {
             "schema": {
               "format": "int32",
               "type": "integer",
-              "example": 1
+              "example": 1,
+              "minimum": 1
             }
           }
         ],
@@ -1393,12 +3075,111 @@ export const EMBEDDED_SPEC = {
             },
             "description": "A successful response."
           },
+          "400": {
+            "description": "Bad request - Invalid query parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidArgument400"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested domain could not be located.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limit has been exceeded.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -1413,11 +3194,97 @@ export const EMBEDDED_SPEC = {
             }
           },
           "500": {
-            "description": "Internal server error occurred.",
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -1429,7 +3296,7 @@ export const EMBEDDED_SPEC = {
         ]
       },
       "post": {
-        "description": "Creates a new email forwarding rule for a domain, such as redirecting info@example.com to an external inbox.  If this is the first email forwarding rule created for the domain, the API may also update your MX records automatically to enable mail routing.  The alias must not conflict with existing email services or MX records.  To modify a forwarding rule later, use [UpdateEmailForwarding](#operation/UpdateEmailForwarding).",
+        "description": "Creates a new email forwarding rule for a domain, such as redirecting info@example.com to an external inbox.  If this is the first email forwarding rule created for the domain, the API may also update your MX records automatically to enable mail routing.  The alias must not conflict with existing email services or MX records.  Wildcard and catch-all forwarding is not supported, so an `emailBox` containing `*` is rejected with a `400 Bad Request`.  To modify a forwarding rule later, use [UpdateEmailForwarding](/api/v1/reference/email-forwardings/update-email-forwarding).",
         "operationId": "CreateEmailForwarding",
         "parameters": [
           {
@@ -1474,20 +3341,83 @@ export const EMBEDDED_SPEC = {
             },
             "description": "Bad request - Invalid input data."
           },
-          "403": {
+          "401": {
+            "description": "Unauthorized.",
             "content": {
               "application/json": {
                 "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
                   "properties": {
                     "message": {
                       "type": "string",
-                      "example": "Permission Denied. The domain is expired."
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
                     }
                   }
                 }
               }
-            },
-            "description": "If the domain in the request has expired, we cannot configure email forwarding for it, and will return this response."
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested domain could not be located.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
           },
           "415": {
             "description": "All POST, PUT, PATCH requests for this API must include the `Content-Type: application/json` header in the requests.",
@@ -1504,7 +3434,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -1519,14 +3460,100 @@ export const EMBEDDED_SPEC = {
             }
           },
           "500": {
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
                 }
               }
-            },
-            "description": "An error occurred on the server."
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "Create Email Forwarding",
@@ -1563,25 +3590,101 @@ export const EMBEDDED_SPEC = {
           "204": {
             "description": "Email Forwarding entry successfully deleted."
           },
-          "403": {
+          "401": {
+            "description": "Unauthorized.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericForbidden403"
-                },
-                "example": {
-                  "message": "Too Many Concurrent Requests"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound404"
                 }
               }
             },
-            "description": "If the domain that was passed in the request has expired, we cannot configure email forwarding for it, and will return this response."
+            "description": "The Email Forwarding record cannot be found."
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
           },
           "429": {
             "description": "Rate limit has been exceeded.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -1596,11 +3699,97 @@ export const EMBEDDED_SPEC = {
             }
           },
           "500": {
-            "description": "Internal server error occurred.",
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -1645,18 +3834,53 @@ export const EMBEDDED_SPEC = {
             },
             "description": "A successful response."
           },
-          "403": {
+          "401": {
+            "description": "Unauthorized.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericForbidden403"
-                },
-                "example": {
-                  "message": "Permission Denied. The domain is expired."
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
                 }
               }
-            },
-            "description": "If the domain that was passed in the request has expired, we cannot configure email forwarding for it, and will return this response."
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
           },
           "404": {
             "content": {
@@ -1668,12 +3892,43 @@ export const EMBEDDED_SPEC = {
             },
             "description": "The Email Forwarding record cannot be found."
           },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limit has been exceeded.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -1692,7 +3947,93 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -1747,18 +4088,53 @@ export const EMBEDDED_SPEC = {
             },
             "description": "A successful response."
           },
-          "403": {
+          "401": {
+            "description": "Unauthorized.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericForbidden403"
-                },
-                "example": {
-                  "message": "Permission Denied. The domain is expired."
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
                 }
               }
-            },
-            "description": "If the domain that was passed in the request has expired, we cannot configure email forwarding for it, and will return this response."
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
           },
           "404": {
             "content": {
@@ -1769,6 +4145,26 @@ export const EMBEDDED_SPEC = {
               }
             },
             "description": "The Email Forwarding record cannot be found."
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
           },
           "415": {
             "description": "All POST, PUT, PATCH requests for this API must include the `Content-Type: application/json` header in the requests.",
@@ -1785,7 +4181,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -1804,7 +4211,93 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -1831,12 +4324,18 @@ export const EMBEDDED_SPEC = {
             }
           },
           {
-            "description": "Per Page is the number of records to return per request. Per Page defaults to 1,000.",
+            "description": "Per Page is the number of records to return per request. Per Page defaults to 500.",
             "in": "query",
             "name": "perPage",
             "schema": {
-              "format": "int32",
-              "type": "integer"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/PerPageLimit"
+                },
+                {
+                  "default": 500
+                }
+              ]
             }
           },
           {
@@ -1845,7 +4344,8 @@ export const EMBEDDED_SPEC = {
             "name": "page",
             "schema": {
               "format": "int32",
-              "type": "integer"
+              "type": "integer",
+              "minimum": 1
             }
           }
         ],
@@ -1860,12 +4360,111 @@ export const EMBEDDED_SPEC = {
             },
             "description": "A successful response."
           },
+          "400": {
+            "description": "Bad request - Invalid input data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidArgument400"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested domain could not be located.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limit has been exceeded.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -1880,11 +4479,97 @@ export const EMBEDDED_SPEC = {
             }
           },
           "500": {
-            "description": "Internal server error occurred.",
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -1928,7 +4613,118 @@ export const EMBEDDED_SPEC = {
                 }
               }
             },
-            "description": "A successful response."
+            "description": "A successful response.",
+            "links": {
+              "GetCreatedRecord": {
+                "operationId": "GetRecord",
+                "parameters": {
+                  "domainName": "$request.path.domainName",
+                  "id": "$response.body#/id"
+                }
+              },
+              "UpdateCreatedRecord": {
+                "operationId": "UpdateRecord",
+                "parameters": {
+                  "domainName": "$request.path.domainName",
+                  "id": "$response.body#/id"
+                }
+              },
+              "DeleteCreatedRecord": {
+                "operationId": "DeleteRecord",
+                "parameters": {
+                  "domainName": "$request.path.domainName",
+                  "id": "$response.body#/id"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - Invalid input data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidArgument400"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested domain could not be located.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
           },
           "415": {
             "description": "All POST, PUT, PATCH requests for this API must include the `Content-Type: application/json` header in the requests.",
@@ -1945,7 +4741,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -1960,11 +4767,97 @@ export const EMBEDDED_SPEC = {
             }
           },
           "500": {
-            "description": "An error occurred on the server.",
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -2015,12 +4908,50 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
-          "403": {
-            "description": "The authoritative nameserver for the request domain is not name.com, or the request domain is expired.",
+          "401": {
+            "description": "Unauthorized.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericForbidden403"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
                 }
               }
             }
@@ -2035,12 +4966,43 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limit has been exceeded.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -2059,7 +5021,93 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -2105,12 +5153,101 @@ export const EMBEDDED_SPEC = {
             },
             "description": "A successful response."
           },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Domain or DNS record not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limit has been exceeded.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -2125,11 +5262,97 @@ export const EMBEDDED_SPEC = {
             }
           },
           "500": {
-            "description": "An error occurred on the server.",
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -2141,7 +5364,7 @@ export const EMBEDDED_SPEC = {
         ]
       },
       "put": {
-        "description": "Replaces an existing DNS record with new data. This is a full overwrite — all required fields (host, type, answer, ttl) must be included in the request body. If you omit a field, the existing value will not be preserved and the request may fail. Use [GetRecord](#operation/GetRecord) beforehand to retrieve the current values if you intend to modify just one field. The record ID must belong to a domain you manage.",
+        "description": "Replaces an existing DNS record with new data. This is a full overwrite — all required fields (host, type, answer, ttl) must be included in the request body. If you omit a field, the existing value will not be preserved and the request may fail. Use [GetRecord](/api/v1/reference/dns/get-record) beforehand to retrieve the current values if you intend to modify just one field. The record ID must belong to a domain you manage.",
         "operationId": "UpdateRecord",
         "parameters": [
           {
@@ -2195,12 +5418,50 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
-          "403": {
-            "description": "The authoritative nameserver for the request domain is not name.com, or the request domain is expired.",
+          "401": {
+            "description": "Unauthorized.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericForbidden403"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
                 }
               }
             }
@@ -2211,6 +5472,26 @@ export const EMBEDDED_SPEC = {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
                 }
               }
             }
@@ -2230,7 +5511,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -2249,7 +5541,93 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -2263,7 +5641,8 @@ export const EMBEDDED_SPEC = {
     },
     "/core/v1/domains/{domainName}/url/forwarding": {
       "get": {
-        "description": "Returns all URL forwarding settings configured for a domain.",
+        "deprecated": true,
+        "description": "Returns all URL forwarding settings configured for a domain. **Deprecated.** Use [List URL Forwardings by domain](/api/v1/reference/url-forwardings/list-urlforwardings-by-domain) instead, which returns entries with an `id` for use with by-ID endpoints.",
         "operationId": "ListURLForwardings",
         "parameters": [
           {
@@ -2278,16 +5657,19 @@ export const EMBEDDED_SPEC = {
             }
           },
           {
-            "description": "Per Page is the number of records to return per request. Per Page defaults to 1,000.",
+            "description": "Per Page is the number of records to return per request. Per Page defaults to 500.",
             "in": "query",
             "name": "perPage",
             "schema": {
-              "format": "int32",
-              "type": "integer",
-              "default": 1000,
-              "minimum": 1,
-              "maximum": 1000,
-              "example": 100
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/PerPageLimit"
+                },
+                {
+                  "default": 500,
+                  "example": 100
+                }
+              ]
             }
           },
           {
@@ -2338,27 +5720,75 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Unauthorized401"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
                 }
               }
             }
           },
           "403": {
-            "description": "The domain you are attempting to update has expired.",
+            "description": "Forbidden - you do not have permission to perform this action.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericForbidden403"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
                 }
               }
             }
           },
           "404": {
-            "description": "Domain or URL forwarding entry not found.",
+            "description": "Domain not found or not owned by the authenticated account.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
                 }
               }
             }
@@ -2368,7 +5798,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -2387,7 +5828,93 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -2418,7 +5945,7 @@ export const EMBEDDED_SPEC = {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateURLForwardingBody"
+                "$ref": "#/components/schemas/URLForwardingInput"
               }
             }
           },
@@ -2451,17 +5978,45 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Unauthorized401"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
                 }
               }
             }
           },
           "403": {
-            "description": "The domain you are attempting to update has expired.",
+            "description": "Forbidden - you do not have permission to perform this action.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericForbidden403"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
                 }
               }
             }
@@ -2472,6 +6027,26 @@ export const EMBEDDED_SPEC = {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
                 }
               }
             }
@@ -2501,7 +6076,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -2520,7 +6106,93 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -2534,7 +6206,8 @@ export const EMBEDDED_SPEC = {
     },
     "/core/v1/domains/{domainName}/url/forwarding/{host}": {
       "delete": {
-        "description": "Removes a URL forwarding configuration from the domain. This operation cannot be undone.",
+        "deprecated": true,
+        "description": "Removes a URL forwarding configuration from the domain. This operation cannot be undone. **Deprecated.** Use [Delete URL Forwarding by ID](/api/v1/reference/url-forwardings/delete-urlforwarding-by-id) instead.",
         "operationId": "DeleteURLForwarding",
         "parameters": [
           {
@@ -2569,17 +6242,45 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Unauthorized401"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
                 }
               }
             }
           },
           "403": {
-            "description": "The domain you are attempting to update has expired.",
+            "description": "Forbidden - you do not have permission to perform this action.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericForbidden403"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
                 }
               }
             }
@@ -2594,12 +6295,43 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limit has been exceeded.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -2618,7 +6350,93 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -2630,7 +6448,8 @@ export const EMBEDDED_SPEC = {
         ]
       },
       "get": {
-        "description": "Retrieves the details of a specific URL forwarding configuration.",
+        "deprecated": true,
+        "description": "Retrieves the details of a specific URL forwarding configuration. **Deprecated.** Use [Get URL Forwarding by ID](/api/v1/reference/url-forwardings/get-urlforwarding-by-id) instead.",
         "operationId": "GetURLForwarding",
         "parameters": [
           {
@@ -2682,17 +6501,45 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Unauthorized401"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
                 }
               }
             }
           },
           "403": {
-            "description": "The domain you are attempting to update has expired.",
+            "description": "Forbidden - you do not have permission to perform this action.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericForbidden403"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
                 }
               }
             }
@@ -2707,12 +6554,43 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limit has been exceeded.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -2731,7 +6609,93 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -2743,7 +6707,8 @@ export const EMBEDDED_SPEC = {
         ]
       },
       "put": {
-        "description": "Modifies an existing URL forwarding rule. Changes may take up to 24 hours to fully propagate.",
+        "deprecated": true,
+        "description": "Modifies an existing URL forwarding rule. Changes may take up to 24 hours to fully propagate. **Deprecated.** Use [Update URL Forwarding by ID](/api/v1/reference/url-forwardings/update-urlforwarding-by-id) instead.",
         "operationId": "UpdateURLForwarding",
         "parameters": [
           {
@@ -2773,7 +6738,7 @@ export const EMBEDDED_SPEC = {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateURLForwardingBody"
+                "$ref": "#/components/schemas/URLForwardingUpdate"
               }
             }
           },
@@ -2806,17 +6771,45 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Unauthorized401"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
                 }
               }
             }
           },
           "403": {
-            "description": "The domain you are attempting to update has expired.",
+            "description": "Forbidden - you do not have permission to perform this action.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericForbidden403"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
                 }
               }
             }
@@ -2827,6 +6820,26 @@ export const EMBEDDED_SPEC = {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
                 }
               }
             }
@@ -2846,7 +6859,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -2865,13 +6889,1165 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
           }
         },
         "summary": "Update URLForwarding",
+        "tags": [
+          "URL Forwardings"
+        ]
+      }
+    },
+    "/core/v1/urlforwarding/{domainName}": {
+      "get": {
+        "description": "Returns all URL forwarding settings configured for a domain. Each entry includes an `id` that can be used with the URL Forwarding by-ID endpoints to get, update, or delete records.",
+        "operationId": "ListURLForwardingsByDomain",
+        "parameters": [
+          {
+            "description": "DomainName is the domain to list URL forwarding entries for. The domain must be owned by the authenticated account.",
+            "in": "path",
+            "name": "domainName",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "example.com",
+              "format": "hostname"
+            }
+          },
+          {
+            "description": "Per Page is the number of records to return per request. Per Page defaults to 500.",
+            "in": "query",
+            "name": "perPage",
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/PerPageLimit"
+                },
+                {
+                  "default": 500,
+                  "example": 100
+                }
+              ]
+            }
+          },
+          {
+            "description": "Page is which page to return. Starts at 1 for first page.",
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "format": "int32",
+              "type": "integer",
+              "default": 1,
+              "minimum": 1,
+              "example": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListURLForwardingsResponse"
+                }
+              }
+            },
+            "headers": {
+              "Link": {
+                "description": "String delimited list of links for pagination",
+                "schema": {
+                  "type": "string",
+                  "example": "<https://api.dev.name.com?page=3; rel=\"next\">,<https://api.dev.name.com?page=1; rel=\"prev\">,<https://api.dev.name.com?page=10; rel=\"last\">"
+                }
+              }
+            },
+            "description": "A successful response containing the list of URL forwarding entries."
+          },
+          "400": {
+            "description": "Bad Request - Invalid parameters or malformed request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidArgument400"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Domain not found or not owned by the authenticated account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit has been exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "x-ratelimit-reset": {
+                "description": "Unix timestamp for the time at which the current rate limit will reset.",
+                "schema": {
+                  "type": "number",
+                  "example": 1747668270
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List URL Forwardings by domain",
+        "tags": [
+          "URL Forwardings"
+        ]
+      }
+    },
+    "/core/v1/urlforwarding/{domainName}/{id}": {
+      "get": {
+        "description": "Retrieves the details of a specific URL forwarding configuration by ID.  The domain must be owned by the authenticated account.",
+        "operationId": "GetURLForwardingById",
+        "parameters": [
+          {
+            "description": "DomainName is the domain that owns the URL forwarding entry. Must be owned by the authenticated account.",
+            "in": "path",
+            "name": "domainName",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "example.com",
+              "format": "hostname"
+            }
+          },
+          {
+            "description": "ID is the server-assigned unique identifier for the URL forwarding record (returned in list responses).",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "example": 12345
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/URLForwardingResponse"
+                }
+              }
+            },
+            "description": "A successful response containing the requested URL forwarding entry."
+          },
+          "400": {
+            "description": "Bad request - Invalid query parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidArgument400"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Domain or URL forwarding entry not found, or domain not owned by the authenticated account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit has been exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "x-ratelimit-reset": {
+                "description": "Unix timestamp for the time at which the current rate limit will reset.",
+                "schema": {
+                  "type": "number",
+                  "example": 1747668270
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get URL Forwarding by ID",
+        "tags": [
+          "URL Forwardings"
+        ]
+      },
+      "patch": {
+        "description": "Modifies an existing URL forwarding rule by ID.  The domain must be owned by the authenticated account. Changes may take up to 24 hours to fully propagate.",
+        "operationId": "UpdateURLForwardingById",
+        "parameters": [
+          {
+            "description": "DomainName is the domain that owns the URL forwarding entry. Must be owned by the authenticated account.",
+            "in": "path",
+            "name": "domainName",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "example.com",
+              "format": "hostname"
+            }
+          },
+          {
+            "description": "ID is the server-assigned unique identifier for the URL forwarding record (returned in list responses).",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "example": 12345
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/URLForwardingUpdate"
+              }
+            }
+          },
+          "required": true,
+          "description": "Updated URL forwarding configuration"
+        },
+        "responses": {
+          "200": {
+            "description": "A successful response containing the updated URL forwarding entry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/URLForwardingResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - Invalid query parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidArgument400"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Domain or URL forwarding entry not found, or domain not owned by the authenticated account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "All POST, PUT, PATCH requests for this API must include the `Content-Type: application/json` header in the requests.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnsupportedMedia415"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit has been exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "x-ratelimit-reset": {
+                "description": "Unix timestamp for the time at which the current rate limit will reset.",
+                "schema": {
+                  "type": "number",
+                  "example": 1747668270
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Update URL Forwarding by ID",
+        "tags": [
+          "URL Forwardings"
+        ]
+      },
+      "delete": {
+        "description": "Removes a URL forwarding configuration by ID. The domain must be owned by the authenticated account. This operation cannot be undone.",
+        "operationId": "DeleteURLForwardingById",
+        "parameters": [
+          {
+            "description": "DomainName is the domain that owns the URL forwarding entry. Must be owned by the authenticated account.",
+            "in": "path",
+            "name": "domainName",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "example.com",
+              "format": "hostname"
+            }
+          },
+          {
+            "description": "ID is the server-assigned unique identifier for the URL forwarding record (returned in list responses).",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "example": 12345
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "URL Forwarding entry successfully deleted."
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Domain or URL forwarding entry not found, or domain not owned by the authenticated account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit has been exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "x-ratelimit-reset": {
+                "description": "Unix timestamp for the time at which the current rate limit will reset.",
+                "schema": {
+                  "type": "number",
+                  "example": 1747668270
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Delete URL Forwarding by ID",
         "tags": [
           "URL Forwardings"
         ]
@@ -2900,13 +8076,17 @@ export const EMBEDDED_SPEC = {
           {
             "name": "perPage",
             "in": "query",
-            "description": "The number of records to return per page. Defaults to 1000.",
+            "description": "The number of records to return per page. Defaults to 500.",
             "schema": {
-              "type": "integer",
-              "format": "int32",
-              "minimum": 1,
-              "default": 1000,
-              "example": 50
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/PerPageLimit"
+                },
+                {
+                  "default": 500,
+                  "example": 50
+                }
+              ]
             },
             "style": "form",
             "explode": true
@@ -2956,12 +8136,50 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
-          "403": {
-            "description": "If the domain that was passed in the request has expired, we cannot create vanity nameservers for it, and will return this response.",
+          "401": {
+            "description": "Unauthorized.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericForbidden403"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
                 }
               }
             }
@@ -2976,12 +8194,43 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limit has been exceeded.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -3000,7 +8249,93 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -3059,12 +8394,50 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
-          "403": {
-            "description": "If the domain that was passed in the request has expired, we cannot create vanity nameservers for it, and will return this response.",
+          "401": {
+            "description": "Unauthorized.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericForbidden403"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
                 }
               }
             }
@@ -3075,6 +8448,36 @@ export const EMBEDDED_SPEC = {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Vanity nameserver already exists for this domain.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericConflict409"
                 }
               }
             }
@@ -3094,7 +8497,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -3113,7 +8527,93 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -3167,12 +8667,50 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
-          "403": {
-            "description": "If the domain that was passed in the request has expired, we cannot delete vanity nameservers for it, and will return this response.",
+          "401": {
+            "description": "Unauthorized.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericForbidden403"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
                 }
               }
             }
@@ -3187,12 +8725,43 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limit has been exceeded.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -3211,7 +8780,93 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -3270,12 +8925,50 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
-          "403": {
-            "description": "If the domain that was passed in the request has expired, we cannot get vanity nameservers for it, and will return this response.",
+          "401": {
+            "description": "Unauthorized.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericForbidden403"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
                 }
               }
             }
@@ -3290,12 +8983,43 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limit has been exceeded.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -3314,7 +9038,93 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -3384,12 +9194,50 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
-          "403": {
-            "description": "If the domain that was passed in the request has expired, we cannot update vanity nameservers for it, and will return this response.",
+          "401": {
+            "description": "Unauthorized.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericForbidden403"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
                 }
               }
             }
@@ -3400,6 +9248,26 @@ export const EMBEDDED_SPEC = {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
                 }
               }
             }
@@ -3419,7 +9287,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -3438,7 +9317,93 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -3448,7 +9413,7 @@ export const EMBEDDED_SPEC = {
     },
     "/core/v1/domains/{domainName}:disableAutorenew": {
       "post": {
-        "description": "Turns off automatic renewal for a domain.  **DEPRECATED** This endpoint is deprecated in favor of the new UpdateDomain API. This will be removed in a future release.",
+        "description": "Turns off automatic renewal for a domain. **DEPRECATED** This endpoint is deprecated in favor of the new UpdateDomain API. This will be removed in a future release.",
         "operationId": "DisableAutorenew",
         "deprecated": true,
         "parameters": [
@@ -3461,20 +9426,20 @@ export const EMBEDDED_SPEC = {
               "type": "string"
             },
             "example": "example.com"
-          },
-          {
-            "description": "Required Content-Type Header for POST requests.",
-            "in": "header",
-            "name": "Content-Type",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "application/json"
-              ]
-            }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "description": "No fields are accepted. Send an empty JSON object `{}` with `Content-Type: application/json`.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmptyObject"
+              },
+              "example": {}
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {
@@ -3496,12 +9461,50 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
-          "403": {
-            "description": "If the domain that was passed in the request has expired, we cannot disable autorenew on it.",
+          "401": {
+            "description": "Unauthorized.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericForbidden403"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
                 }
               }
             }
@@ -3512,6 +9515,26 @@ export const EMBEDDED_SPEC = {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
                 }
               }
             }
@@ -3531,7 +9554,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -3550,7 +9584,93 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -3577,20 +9697,20 @@ export const EMBEDDED_SPEC = {
               "type": "string"
             },
             "example": "example.com"
-          },
-          {
-            "description": "Required Content-Type Header for POST requests.",
-            "in": "header",
-            "name": "Content-Type",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "application/json"
-              ]
-            }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "description": "No fields are accepted. Send an empty JSON object `{}` with `Content-Type: application/json`.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmptyObject"
+              },
+              "example": {}
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {
@@ -3612,12 +9732,50 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
-          "403": {
-            "description": "If the domain that was passed in the request has expired, we cannot disable Whois Privacy on it.",
+          "401": {
+            "description": "Unauthorized.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericForbidden403"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
                 }
               }
             }
@@ -3628,6 +9786,26 @@ export const EMBEDDED_SPEC = {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
                 }
               }
             }
@@ -3647,7 +9825,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -3666,7 +9855,93 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -3693,20 +9968,20 @@ export const EMBEDDED_SPEC = {
               "type": "string"
             },
             "example": "example.com"
-          },
-          {
-            "description": "Required Content-Type Header for POST requests.",
-            "in": "header",
-            "name": "Content-Type",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "application/json"
-              ]
-            }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "description": "No fields are accepted. Send an empty JSON object `{}` with `Content-Type: application/json`.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmptyObject"
+              },
+              "example": {}
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {
@@ -3728,12 +10003,50 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
-          "403": {
-            "description": "If the domain that was passed in the request has expired, we cannot enable autorenew on it.",
+          "401": {
+            "description": "Unauthorized.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericForbidden403"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
                 }
               }
             }
@@ -3744,6 +10057,26 @@ export const EMBEDDED_SPEC = {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
                 }
               }
             }
@@ -3763,7 +10096,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -3782,7 +10126,93 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -3808,20 +10238,20 @@ export const EMBEDDED_SPEC = {
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "description": "Required Content-Type Header for POST requests.",
-            "in": "header",
-            "name": "Content-Type",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "application/json"
-              ]
-            }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "description": "No fields are accepted. Send an empty JSON object `{}` with `Content-Type: application/json`.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmptyObject"
+              },
+              "example": {}
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {
@@ -3844,21 +10274,49 @@ export const EMBEDDED_SPEC = {
             }
           },
           "401": {
-            "description": "If the domain that was passed in the request has expired, we cannot enable Whois Privacy on it.",
+            "description": "Unauthorized.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Unauthorized401"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
                 }
               }
             }
           },
           "403": {
-            "description": "If the domain that was passed in the request has expired, we cannot enable autorenew on it.",
+            "description": "Forbidden - you do not have permission to perform this action.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericForbidden403"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
                 }
               }
             }
@@ -3869,6 +10327,26 @@ export const EMBEDDED_SPEC = {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
                 }
               }
             }
@@ -3888,7 +10366,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -3907,7 +10396,93 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -3945,12 +10520,50 @@ export const EMBEDDED_SPEC = {
             },
             "description": "A successful response."
           },
-          "403": {
-            "description": "You are attempting to make an API request with invalid credentials.",
+          "401": {
+            "description": "Unauthorized.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericForbidden403"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
                 }
               }
             }
@@ -3961,6 +10574,26 @@ export const EMBEDDED_SPEC = {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
                 }
               }
             }
@@ -3983,7 +10616,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -3998,11 +10642,97 @@ export const EMBEDDED_SPEC = {
             }
           },
           "500": {
-            "description": "An error has occurred on the server.",
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -4016,7 +10746,7 @@ export const EMBEDDED_SPEC = {
     },
     "/core/v1/domains/{domainName}:getPricing": {
       "get": {
-        "description": "Retrieves the registration and renewal pricing for a given domain.",
+        "description": "Returns registration, renewal, and transfer pricing for a domain and term.\n\n**Not a discovery endpoint:** Does not return `purchaseType`. Cannot determine whether a domain is acquired via registration vs aftermarket/expiring/backorder — call [Search](/api/v1/reference/domains/search) or [Check Availability](/api/v1/reference/domains/check-availability) first.\n\n**Scope:** `purchasePrice` and `premium` reflect **standard and registry-premium registration** only. They do **not** return aftermarket, expiring, or backorder acquisition prices. For those types, use `purchasePrice` from Search or Check Availability.\n\n**Registration create (`purchaseType: registration`):** When create requires `purchasePrice` (registry premium), call with the **same** `years` you will send on create. Pass `purchasePrice` directly — it is the **total** for that term, not a per-year component.\n\n**Renew:** Pass `renewalPrice` as `purchasePrice` on [Renew Domain](/api/v1/reference/domains/renew-domain) for premium renewals — not for computing Create Domain totals.\n\n**Transfer:** Pass `transferPrice` as `purchasePrice` on [Create Transfer](/api/v1/reference/transfers/create-transfer) for premium transfers. The `years` query parameter does not affect `transferPrice`.\n\nSee the [Domain pricing guide](/guides/domain-pricing) for the full workflow.\n",
         "operationId": "GetPricingForDomain",
         "parameters": [
           {
@@ -4030,11 +10760,13 @@ export const EMBEDDED_SPEC = {
           },
           {
             "name": "years",
-            "description": "Years specifies the time period in years to get pricing for the domain. Years defaults to the minimum time period (typically 1 year) if not passed and cannot be more than 10.  Some TLDs default to longer periods (e.g. .AI requires 2 year periods).",
+            "description": "Years specifies the registration term to price in years. Defaults to each TLD's minimum registration term if omitted — usually 1 year (2 for `.ai`). Must be a supported registration term for the TLD (commonly 1–10 years). Use the same value on Create Domain when passing `purchasePrice` for `purchaseType: registration`.",
             "in": "query",
             "schema": {
               "format": "int32",
               "type": "integer",
+              "minimum": 1,
+              "maximum": 10,
               "example": 2
             }
           }
@@ -4056,6 +10788,62 @@ export const EMBEDDED_SPEC = {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/InvalidArgument400"
+                },
+                "examples": {
+                  "invalidYears": {
+                    "summary": "Invalid registration term",
+                    "value": {
+                      "message": "Invalid value for years for this domain"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
                 }
               }
             }
@@ -4070,12 +10858,61 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "TLD not supported.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnprocessableEntity422"
+                },
+                "examples": {
+                  "tldNotSupported": {
+                    "summary": "TLD not supported",
+                    "value": {
+                      "message": "Unsupported TLD"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limit has been exceeded.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -4085,6 +10922,102 @@ export const EMBEDDED_SPEC = {
                 "schema": {
                   "type": "number",
                   "example": 1747668270
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -4111,20 +11044,20 @@ export const EMBEDDED_SPEC = {
               "type": "string"
             },
             "example": "example.com"
-          },
-          {
-            "description": "Required Content-Type Header for POST requests.",
-            "in": "header",
-            "name": "Content-Type",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "application/json"
-              ]
-            }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "description": "No fields are accepted. Send an empty JSON object `{}` with `Content-Type: application/json`.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmptyObject"
+              },
+              "example": {}
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {
@@ -4146,12 +11079,50 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
-          "403": {
-            "description": "If the domain that was passed in the request has expired, we cannot lock the domain.",
+          "401": {
+            "description": "Unauthorized.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericForbidden403"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
                 }
               }
             }
@@ -4162,6 +11133,26 @@ export const EMBEDDED_SPEC = {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
                 }
               }
             }
@@ -4181,7 +11172,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -4200,7 +11202,93 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -4214,11 +11302,11 @@ export const EMBEDDED_SPEC = {
     },
     "/core/v1/domains/{domainName}:purchasePrivacy": {
       "post": {
-        "description": "Adds or renews WHOIS privacy protection for a domain. This is used to ensure personal contact details remain hidden from public WHOIS lookups.  If WHOIS privacy is already enabled, this will extend the protection. If it’s not yet active, this will both purchase and enable the service.  This is a billable action unless covered by a bundled privacy plan.",
+        "description": "Adds or renews WHOIS privacy protection for a domain. This is used to ensure personal contact details remain hidden from public WHOIS lookups.  If WHOIS privacy is already enabled, this will extend the protection. If it’s not yet active, this will enable the service.  WHOIS privacy is free for API users and does not add a fee.",
         "operationId": "PurchasePrivacy",
         "parameters": [
           {
-            "description": "DomainName is the domain to purchase Whois Privacy for.",
+            "description": "DomainName is the domain to enable or extend Whois Privacy for.",
             "in": "path",
             "name": "domainName",
             "required": true,
@@ -4258,7 +11346,7 @@ export const EMBEDDED_SPEC = {
                 }
               },
               "X-Idempotent-Replay": {
-                "description": "Indicates that the response is being replayed from an idempotent request. This header will only be returned if the API is responding with cached data. Caches are cleared after 12 hours.",
+                "description": "Indicates that the response is being replayed from an idempotent request. This header will only be returned if the API is responding with cached data. Caches are cleared after 1 hour.",
                 "schema": {
                   "type": "number",
                   "example": 1
@@ -4279,7 +11367,17 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Unauthorized401"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
                 }
               }
             }
@@ -4294,16 +11392,84 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
-          "409": {
-            "description": "When sending idempotent requests, this response indicates that there was an issue with the idempotency keys.",
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "required": [
+                    "message"
+                  ],
                   "properties": {
                     "message": {
                       "type": "string",
-                      "example": "Idempotency key has been reused for a different request"
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested domain could not be located.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict - Idempotency key reused for a different request, or privacy protection already exists for this domain.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Conflict409"
+                },
+                "examples": {
+                  "idempotencyConflict": {
+                    "summary": "Idempotency key reused",
+                    "value": {
+                      "message": "Conflict",
+                      "details": "Idempotency key has been reused for a different request."
+                    }
+                  },
+                  "privacyAlreadyExists": {
+                    "summary": "Privacy already exists",
+                    "value": {
+                      "message": "Conflict",
+                      "details": "Privacy protection already exists for this domain."
                     }
                   }
                 }
@@ -4320,12 +11486,41 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
+          "422": {
+            "description": "TLD not supported.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnprocessableEntity422"
+                },
+                "examples": {
+                  "tldNotSupported": {
+                    "summary": "TLD not supported",
+                    "value": {
+                      "message": "Unsupported TLD"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limit has been exceeded.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -4344,7 +11539,93 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -4358,7 +11639,7 @@ export const EMBEDDED_SPEC = {
     },
     "/core/v1/domains/{domainName}:renew": {
       "post": {
-        "description": "Renews an existing domain for an additional registration period.  Include the domain name and renewal term.  If the domain has non-standard pricing (e.g. premium), the purchasePrice must be passed.  This is typically used to extend ownership before a domain’s expiration.",
+        "description": "Renews an existing domain for an additional registration period. Include the domain name and renewal term. Omit `purchasePrice` for standard (non-premium) renewals. For premium renewals, pass `renewalPrice` from [Get Pricing](/api/v1/reference/domains/get-pricing-for-domain) with matching `years` as `purchasePrice`. Renewal pricing is separate from Create Domain registration/acquisition pricing. This is typically used to extend ownership before a domain’s expiration.",
         "operationId": "RenewDomain",
         "parameters": [
           {
@@ -4400,18 +11681,70 @@ export const EMBEDDED_SPEC = {
                   "$ref": "#/components/schemas/InvalidArgument400"
                 },
                 "examples": {
-                  "renewalPriceRequired": {
-                    "summary": "Renewal price required",
-                    "value": {
-                      "message": "Invalid argument",
-                      "details": "Purchase price is required in order to complete this request"
-                    }
-                  },
                   "premiumRenewalPriceRequired": {
                     "summary": "Premium renewal price required",
                     "value": {
-                      "message": "Invalid argument",
-                      "details": "Purchase price is required for premium domains in order to complete this request"
+                      "message": "Purchase price is required for premium domains in order to complete this request"
+                    }
+                  },
+                  "priceMismatch": {
+                    "summary": "Purchase price does not match",
+                    "value": {
+                      "message": "Purchase price does not match"
+                    }
+                  },
+                  "invalidYears": {
+                    "summary": "Invalid renewal term",
+                    "value": {
+                      "message": "Invalid years"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
                     }
                   }
                 }
@@ -4428,6 +11761,26 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "415": {
             "description": "All POST, PUT, PATCH requests for this API must include the `Content-Type: application/json` header in the requests.",
             "content": {
@@ -4439,7 +11792,7 @@ export const EMBEDDED_SPEC = {
             }
           },
           "422": {
-            "description": "Pricing information unavailable.",
+            "description": "Pricing information unavailable, or TLD not supported.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4452,6 +11805,12 @@ export const EMBEDDED_SPEC = {
                       "message": "Domain pricing unavailable",
                       "details": "The pricing information required to process this request is temporarily unavailable. This is an internal system error. Please try again in a few minutes or contact support if the issue persists."
                     }
+                  },
+                  "tldNotSupported": {
+                    "summary": "TLD not supported",
+                    "value": {
+                      "message": "Unsupported TLD"
+                    }
                   }
                 }
               }
@@ -4462,7 +11821,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -4472,6 +11842,102 @@ export const EMBEDDED_SPEC = {
                 "schema": {
                   "type": "number",
                   "example": 1747668270
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -4485,7 +11951,7 @@ export const EMBEDDED_SPEC = {
     },
     "/core/v1/domains/{domainName}:setContacts": {
       "post": {
-        "description": "Updates WHOIS contact information for a domain. This includes the registrant, administrative, technical, and billing contacts.  All contact objects must be complete — partial updates are not supported.  You should fetch the existing contact data first (e.g., via [GetDomain](#operation/GetDomain) and modify only the values you wish to change.  This call replaces all four contact sets at once.\n#### Contact Verification\nWhen registrant contact information is updated, validation may be triggered if the new contact information has not been previously validated. This validation is required by ICANN for all TLDs except country-code TLDs (ccTLDs). This validation involves sending an email to the provided address, prompting the recipient to click a link to verify their email address.",
+        "description": "Updates WHOIS contact information for a domain. This includes the registrant, administrative, technical, and billing contacts.  All contact objects must be complete — partial updates are not supported.  You should fetch the existing contact data first (e.g., via [GetDomain](/api/v1/reference/domains/get-domain) and modify only the values you wish to change.  This call replaces all four contact sets at once.\n#### Contact Verification\nWhen registrant contact information is updated, validation may be triggered if the new contact information has not been previously validated. This validation is required by ICANN for all TLDs except country-code TLDs (ccTLDs). This validation involves sending an email to the provided address, prompting the recipient to click a link to verify their email address.",
         "operationId": "SetContacts",
         "parameters": [
           {
@@ -4530,12 +11996,50 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
-          "403": {
-            "description": "If the domain that was passed in the request has expired, we cannot set contacts for it, and will return this response.",
+          "401": {
+            "description": "Unauthorized.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericForbidden403"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
                 }
               }
             }
@@ -4546,6 +12050,26 @@ export const EMBEDDED_SPEC = {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
                 }
               }
             }
@@ -4565,7 +12089,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -4584,7 +12119,93 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -4634,21 +12255,68 @@ export const EMBEDDED_SPEC = {
             }
           },
           "400": {
-            "description": "Bad request - Invalid query parameters.",
+            "description": "Bad request — invalid parameters or the registry rejected the update because the domain's status prohibits it (EPP 2304, for example clientUpdateProhibited). Remove the blocking lock or hold, then retry.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/InvalidArgument400"
+                },
+                "examples": {
+                  "domainStatusProhibitsUpdate": {
+                    "summary": "Domain status prohibits nameserver update",
+                    "value": {
+                      "message": "Domain status does not allow this operation.",
+                      "details": "Command Failed - The Domain Cannot Be Updated (clientUpdateProhibited)."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
                 }
               }
             }
           },
           "403": {
-            "description": "If the domain that was passed in the request has expired, we cannot set nameservers for it, and will return this response.",
+            "description": "Forbidden - you do not have permission to perform this action.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericForbidden403"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
                 }
               }
             }
@@ -4659,6 +12327,26 @@ export const EMBEDDED_SPEC = {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
                 }
               }
             }
@@ -4678,7 +12366,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -4697,7 +12396,93 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -4723,20 +12508,20 @@ export const EMBEDDED_SPEC = {
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "description": "Required Content-Type Header for POST requests.",
-            "in": "header",
-            "name": "Content-Type",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "application/json"
-              ]
-            }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "description": "No fields are accepted. Send an empty JSON object `{}` with `Content-Type: application/json`.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmptyObject"
+              },
+              "example": {}
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {
@@ -4758,12 +12543,50 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
-          "403": {
-            "description": "If the domain that was passed in the request has expired, we cannot unlock the domain.",
+          "401": {
+            "description": "Unauthorized.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericForbidden403"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
                 }
               }
             }
@@ -4774,6 +12597,26 @@ export const EMBEDDED_SPEC = {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
                 }
               }
             }
@@ -4793,7 +12636,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -4812,7 +12666,93 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -4826,7 +12766,7 @@ export const EMBEDDED_SPEC = {
     },
     "/core/v1/domains:checkAvailability": {
       "post": {
-        "description": "CheckAvailability will check a list of domains to see if they are purchasable. A Maximum of 50 domains can be specified.",
+        "description": "Checks whether up to 50 domain names are purchasable and returns **discovery** pricing for each result.\n\n**Discovery endpoint:** Returns `SearchResult` fields — `purchaseType`, `purchasePrice`, `premium`, `purchasable`. [Search](/api/v1/reference/domains/search) returns the same fields for keyword/suggestion flows. Use this endpoint to determine what to send on [Create Domain](/api/v1/reference/domains/create-domain).\n\nWhen results show `premium: true` or a non-`registration` `purchaseType`, follow the [Domain pricing guide](/guides/domain-pricing) before calling Create Domain. For non-registration types, re-check Check Availability immediately before create — acquisition prices can change.\n\n**Recommendation:** Set `purchaseType` to `registration`. Most resellers \nrestrict results to domains with a `purchaseType` of `registration`\nto ensure predictable pricing and immediate fulfillment. Other purchase types\n(such as aftermarket variants) can introduce higher costs and non-instant\ntransactions that may be delayed or declined by third parties.\n",
         "operationId": "CheckAvailability",
         "requestBody": {
           "content": {
@@ -4855,7 +12795,65 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Unauthorized401"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
                 }
               }
             }
@@ -4885,7 +12883,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -4899,12 +12908,98 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
-          "502": {
-            "description": "Registries can sometimes go into maintenance, or be unavailable for several reasons. If we are unable to contact the registry for the domains you are checking the availability for, we will return this response.",
+          "500": {
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BadGateway502"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -4918,7 +13013,7 @@ export const EMBEDDED_SPEC = {
     },
     "/core/v1/domains:search": {
       "post": {
-        "description": "Searches for domain name suggestions based on a keyword or term. Important: Do not encode the `:` in the path. Use `/core/v1/domains:search`, not `/core/v1/domains%3Asearch`.",
+        "description": "Searches for domain name suggestions based on a keyword or term. Important: Do not\nencode the `:` in the path. Use `/core/v1/domains:search`, not `/core/v1/domains%3Asearch`.\n\n**Discovery endpoint:** Returns `SearchResult` fields — `purchaseType`, `purchasePrice`, `premium`, `purchasable`.\n\n**Recommendation:** Set `purchaseType` to `registration`. Most resellers restrict\nresults to domains with a `purchaseType` of `registration` to ensure predictable\npricing and immediate fulfillment. Other purchase types (such as aftermarket) can\nintroduce higher costs and non-instant transactions that may be delayed or declined\nby third parties.\nWith `purchaseType: registration`, domains that do not match the filter are **omitted** from results (unlike Check Availability, which returns them with `purchasable: false`).\n\nWhen results show `premium: true` or a non-`registration` `purchaseType`, follow the [Domain pricing guide](/guides/domain-pricing) before calling Create Domain. For all types, re-check with Check Availability immediately before create — prices and availability can change.\n",
         "operationId": "Search",
         "requestBody": {
           "content": {
@@ -4952,6 +13047,74 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "415": {
             "description": "All POST, PUT, PATCH requests for this API must include the `Content-Type: application/json` header in the requests.",
             "content": {
@@ -4967,7 +13130,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -4982,11 +13156,97 @@ export const EMBEDDED_SPEC = {
             }
           },
           "500": {
-            "description": "An internal error occurred on the server.",
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -5018,7 +13278,65 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Unauthorized401"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
                 }
               }
             }
@@ -5028,7 +13346,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -5047,7 +13376,93 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -5079,7 +13494,65 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Unauthorized401"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
                 }
               }
             }
@@ -5089,7 +13562,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -5108,7 +13592,93 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -5120,7 +13690,7 @@ export const EMBEDDED_SPEC = {
         ]
       },
       "post": {
-        "description": "Creates a webhook subscription to receive real-time notifications about specific domain or account events (e.g. transfer completions, renewals).  Pass the callback URL and event types. This allows external systems to stay in sync with name.com changes.",
+        "description": "Creates a webhook subscription to receive real-time notifications about specific domain or account events (e.g. transfer completions, renewals). Pass the callback URL and event types. This allows external systems to stay in sync with name.com changes.\nSupported webhook event names:\n- `account.credit.balance_change` – account credit balance changes (increases or decreases).\n- `account.domain.removal` – domain removed from the subscribing account.\n- `domain.lock.status_change` – domain lock added or removed.\n- `domain.transfer.status_change` – domain transfer IN to name.com; status updates while name.com is the gaining registrar.\n- `domain.transfer_out.status_change` – domain transfer OUT from name.com; `initiated`, `completed` (domain removed), or `canceled` (no longer pending at the registry).\n- `domain.transfer.internal_in` - name.com domain transfers in to the subscribing account via internal transfer.\n- `domain.transfer.internal_out` - name.com domain transfers out of the subscribing account via internal transfer.\n- `contact.verification.status_change` - contact verification status changes (verified or unverified).\n- `domain.registry.rejection` – domain **create** failed after asynchronous registry processing (uncommon; most creates succeed at request time).\n- `domain.expiration` – domain has expired and entered the post-expiry grace period. This is informational only.",
         "operationId": "SubscribeToNotification",
         "requestBody": {
           "content": {
@@ -5142,12 +13712,80 @@ export const EMBEDDED_SPEC = {
             },
             "description": "A successful response."
           },
+          "400": {
+            "description": "Bad request - Invalid input data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidArgument400"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Unauthorized401"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
                 }
               }
             }
@@ -5177,7 +13815,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -5196,13 +13845,99 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
           }
         },
-        "summary": "Subscribe To Notification",
+        "summary": "Subscribe to Notification",
         "tags": [
           "Webhook Notifications"
         ]
@@ -5233,7 +13968,75 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Unauthorized401"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be located.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
                 }
               }
             }
@@ -5243,7 +14046,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -5262,7 +14076,93 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -5345,12 +14245,80 @@ export const EMBEDDED_SPEC = {
             },
             "description": "A successful response."
           },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "404": {
             "description": "The requested resource could not be located.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
                 }
               }
             }
@@ -5370,7 +14338,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -5385,11 +14364,97 @@ export const EMBEDDED_SPEC = {
             }
           },
           "500": {
-            "description": "An error occurred on the server.",
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -5408,12 +14473,17 @@ export const EMBEDDED_SPEC = {
         "parameters": [
           {
             "name": "perPage",
-            "description": "Per Page is the number of records to return per request. Per Page defaults to 1,000.",
+            "description": "Per Page is the number of records to return per request. Per Page defaults to 500.",
             "in": "query",
             "schema": {
-              "format": "int32",
-              "type": "integer",
-              "default": 1000
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/PerPageLimit"
+                },
+                {
+                  "default": 500
+                }
+              ]
             }
           },
           {
@@ -5423,7 +14493,71 @@ export const EMBEDDED_SPEC = {
             "schema": {
               "format": "int32",
               "type": "integer",
-              "default": 1
+              "default": 1,
+              "minimum": 1
+            }
+          },
+          {
+            "name": "dir",
+            "description": "Dir indicates direction of list order. Possible values are 'asc' (default) or 'desc'.",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "domainName",
+            "description": "DomainName filters orders by domain name. Supports exact match or wildcard (starts with '*').",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tld",
+            "description": "Tld filters orders by tld.",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "createDateStart",
+            "description": "CreateDateStart filters orders created on or after this date.",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "createDateEnd",
+            "description": "CreateDateEnd filters orders created on or before this date.",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "description": "Type filters orders by order item type (e.g., 'registration', 'renewal', 'transfer', 'whois_privacy').",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderStatus",
+            "description": "OrderStatus filters orders by status.",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "success",
+                "failed",
+                "initialized",
+                "review",
+                "started"
+              ]
             }
           }
         ],
@@ -5447,12 +14581,80 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
+          "400": {
+            "description": "Bad request - Invalid query parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidArgument400"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Unauthorized401"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
                 }
               }
             }
@@ -5462,7 +14664,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -5481,7 +14694,93 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -5520,6 +14819,54 @@ export const EMBEDDED_SPEC = {
             },
             "description": "A successful response."
           },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "404": {
             "description": "Order not found.",
             "content": {
@@ -5530,12 +14877,43 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limit has been exceeded.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -5548,11 +14926,514 @@ export const EMBEDDED_SPEC = {
                 }
               }
             }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "Get Order",
         "tags": [
           "Orders"
+        ]
+      }
+    },
+    "/core/v1/refund": {
+      "post": {
+        "description": "Deletes eligible domains and security products during the Add Grace Period (AGP) and automatically issues refunds for the associated order items.\n\n### Eligibility Requirements\n\n- **Product Types**: Only `registration` and `whois_privacy` product types are eligible for refunds.\n- **AGP Timing**: Items must be within the Add Grace Period (typically 5 days from registration, varies by TLD).\n- **Order Ownership**: All `orderItemIds` must belong to the specified `orderId`.\n\n### Refund Processing\n\nRefunds are processed in the following order:\n1. Domain deletion is attempted for each eligible order item\n2. Upon successful deletion, the refund is issued\n3. Refunds are sent to the original payment method on file\n4. If the original payment method is unavailable, the refund is credited to the account balance\n\n### Idempotency\n\nThis endpoint supports idempotent requests via the `X-Idempotency-Key` header. If you retry a request with the same idempotency key, you will receive the same response as the original request. This is useful for safely retrying requests without risk of processing duplicate refunds.\n",
+        "operationId": "ProcessRefund",
+        "parameters": [
+          {
+            "name": "X-Idempotency-Key",
+            "in": "header",
+            "description": "A unique string (e.g., a UUID v4) to make the request idempotent. This key ensures that if the request is retried, the operation will not be performed multiple times. Subsequent requests with the same key will return the original result. Idempotency keys are valid for 1 hour.",
+            "schema": {
+              "type": "string",
+              "example": "083910ef-04e4-4bd1-a0bf-3737fe005ca8"
+            },
+            "required": false
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefundRequest"
+              },
+              "examples": {
+                "singleItem": {
+                  "summary": "Refund a single order item",
+                  "description": "Request to refund a single domain registration from an order.  If there is a security product associated with the domain, it will also be refunded.",
+                  "value": {
+                    "orderId": 123456,
+                    "orderItemIds": [
+                      987654
+                    ]
+                  }
+                },
+                "multipleItems": {
+                  "summary": "Refund multiple order items",
+                  "description": "Request to refund multiple items (e.g., domain registration and security product) from a single order.",
+                  "value": {
+                    "orderId": 123456,
+                    "orderItemIds": [
+                      987654,
+                      987655
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "description": "RefundRequest contains the order ID and array of order item IDs to be refunded.",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "headers": {
+              "X-Idempotency-Key": {
+                "description": "If the initial request contained this header, echoes back with the initial value.",
+                "schema": {
+                  "type": "string",
+                  "example": "083910ef-04e4-4bd1-a0bf-3737fe005ca8"
+                }
+              },
+              "X-Idempotent-Replay": {
+                "description": "Indicates that the response is being replayed from an idempotent request. This header will only be returned if the API is responding with cached data. Caches are cleared after 1 hour.",
+                "schema": {
+                  "type": "number",
+                  "example": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundResponse"
+                },
+                "examples": {
+                  "successfulRefund": {
+                    "summary": "Successful refund of domain registration",
+                    "value": {
+                      "results": [
+                        {
+                          "orderId": 123456,
+                          "orderItemId": 987654,
+                          "orderItemStatus": "refunded",
+                          "refundAmount": 10.99,
+                          "message": "Domain successfully deleted and refund processed."
+                        }
+                      ],
+                      "totalRefundAmount": 10.99
+                    }
+                  }
+                }
+              }
+            },
+            "description": "Refund processed successfully. The response includes the detailed results for each refunded item."
+          },
+          "400": {
+            "description": "Bad request - Invalid input data or order item has already been refunded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidArgument400"
+                },
+                "examples": {
+                  "alreadyRefunded": {
+                    "summary": "Order item already refunded",
+                    "value": {
+                      "message": "Bad Request",
+                      "details": "Order item 987654 has already been refunded."
+                    }
+                  },
+                  "invalidProductType": {
+                    "summary": "Invalid product type",
+                    "value": {
+                      "message": "Bad Request",
+                      "details": "Order item 987654 is not eligible for refund. Only 'registration' and 'whois_privacy' product types are supported."
+                    }
+                  },
+                  "emptyOrderItems": {
+                    "summary": "Empty order items array",
+                    "value": {
+                      "message": "Bad Request",
+                      "details": "orderItemIds array must contain at least one item."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found - Order ID or order item ID does not exist, or order items do not belong to the specified order.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound404"
+                },
+                "examples": {
+                  "orderNotFound": {
+                    "summary": "Order not found",
+                    "value": {
+                      "message": "Not Found",
+                      "details": "Order with ID 123456 does not exist."
+                    }
+                  },
+                  "itemNotFound": {
+                    "summary": "Order item not found",
+                    "value": {
+                      "message": "Not Found",
+                      "details": "Order item 987654 does not exist or does not belong to order 123456."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict - Idempotency key reused for different request, or AGP delete threshold exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Conflict409"
+                },
+                "examples": {
+                  "idempotencyConflict": {
+                    "summary": "Idempotency key reused",
+                    "value": {
+                      "message": "Conflict",
+                      "details": "Idempotency key has been reused for a different request."
+                    }
+                  },
+                  "thresholdExceeded": {
+                    "summary": "AGP threshold exceeded",
+                    "value": {
+                      "message": "Conflict",
+                      "details": "AGP delete threshold has been exceeded for this account. Please contact support."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported Media Type - All POST requests must include the `Content-Type: application/json` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnsupportedMedia415"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "Locked - The deletion timing is outside registry limits. The Add Grace Period (AGP) has expired for one or more items.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Locked423"
+                },
+                "examples": {
+                  "agpExpired": {
+                    "summary": "AGP window expired",
+                    "value": {
+                      "message": "Resource Locked",
+                      "details": "The Add Grace Period (AGP) deletion window has expired for domain example.com. AGP deletes are only allowed within 5 days of registration."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit has been exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "x-ratelimit-reset": {
+                "description": "Unix timestamp for the time at which the current rate limit will reset.",
+                "schema": {
+                  "type": "number",
+                  "example": 1747668270
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway - Registry connection unavailable or registry-related problem occurred.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadGateway502"
+                },
+                "examples": {
+                  "registryError": {
+                    "summary": "Registry connection error",
+                    "value": {
+                      "message": "Registry Connection Unavailable"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Process Refund",
+        "tags": [
+          "Refunds"
         ]
       }
     },
@@ -5562,12 +15443,18 @@ export const EMBEDDED_SPEC = {
         "operationId": "ListTransfers",
         "parameters": [
           {
-            "description": "Per Page is the number of records to return per request. Per Page defaults to 1,000.",
+            "description": "Per Page is the number of records to return per request. Per Page defaults to 500.",
             "in": "query",
             "name": "perPage",
             "schema": {
-              "format": "int32",
-              "type": "integer"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/PerPageLimit"
+                },
+                {
+                  "default": 500
+                }
+              ]
             }
           },
           {
@@ -5576,7 +15463,8 @@ export const EMBEDDED_SPEC = {
             "name": "page",
             "schema": {
               "format": "int32",
-              "type": "integer"
+              "type": "integer",
+              "minimum": 1
             }
           }
         ],
@@ -5600,12 +15488,32 @@ export const EMBEDDED_SPEC = {
             },
             "description": "A successful response."
           },
+          "400": {
+            "description": "Bad request - Invalid query parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidArgument400"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Unauthorized401"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
                 }
               }
             }
@@ -5620,12 +15528,71 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limit has been exceeded.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -5640,14 +15607,100 @@ export const EMBEDDED_SPEC = {
             }
           },
           "500": {
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
                 }
               }
-            },
-            "description": "A server error occurred."
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "List Transfers",
@@ -5656,7 +15709,7 @@ export const EMBEDDED_SPEC = {
         ]
       },
       "post": {
-        "description": "Initiates a domain transfer into your name.com account from another registrar.  You must provide the domain name and its valid transfer authorization code (EPP code).  The domain must not be locked or under any transfer restrictions (e.g. clientTransferProhibited).  If successful, the transfer is submitted and tracked through the ICANN transfer process. Once a transfer has been created, you can track its progress via the [GetTransfer](#operation/GetTransfer) endpoint.",
+        "description": "Initiates a domain transfer into your name.com account from another registrar. You must provide the domain name and its valid transfer authorization code (EPP code). The domain must not be locked or under any transfer restrictions (e.g. clientTransferProhibited). If successful, the transfer is submitted and tracked through the ICANN transfer process. Once a transfer has been created, you can track its progress via the [GetTransfer](/api/v1/reference/transfers/get-transfer) endpoint.\n**Transfer pricing:** Omit `purchasePrice` for standard (non-premium) transfers. For premium transfers, pass `transferPrice` from [Get Pricing For Domain](/api/v1/reference/domains/get-pricing-for-domain) as `purchasePrice`. If sent, it must match Get Pricing `transferPrice` exactly or the request will fail. Premium transfers without `purchasePrice` will fail. See the [Domain pricing guide](/guides/domain-pricing) for how [Get Pricing](/api/v1/reference/domains/get-pricing-for-domain) `transferPrice` relates to the `years` query parameter.",
         "operationId": "CreateTransfer",
         "requestBody": {
           "content": {
@@ -5685,10 +15738,44 @@ export const EMBEDDED_SPEC = {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/InvalidArgument400"
+                },
+                "examples": {
+                  "premiumPriceRequired": {
+                    "summary": "Premium transfer requires purchasePrice",
+                    "value": {
+                      "message": "PurchasePrice is required if the domain to transfer is a premium domain"
+                    }
+                  },
+                  "priceMismatch": {
+                    "summary": "Transfer price does not match",
+                    "value": {
+                      "message": "Invalid Price"
+                    }
+                  }
                 }
               }
             },
             "description": "There was an invalid or missing argument in the request. The response messages will indicate which fields are invalid."
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
           },
           "402": {
             "description": "The account placing the order has insufficient account credit to process this transfer order.",
@@ -5699,6 +15786,54 @@ export const EMBEDDED_SPEC = {
                 },
                 "example": {
                   "message": "Insufficient Funds"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
                 }
               }
             }
@@ -5747,20 +15882,116 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "x-ratelimit-reset": {
+                "description": "Unix timestamp for the time at which the current rate limit will reset.",
+                "schema": {
+                  "type": "number",
+                  "example": 1747668270
                 }
               }
             }
           },
           "500": {
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
                 }
               }
-            },
-            "description": "This can mean there was an internal error on the server, or that the domain has a lock status that prevents the transfers. Please confirm by checking the message parameter. We will update this API at a later date to have a more accurate response code in this instance."
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Unable to retrieve domain status due to blocked-hostname.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout504"
+                }
+              }
+            }
           }
         },
         "summary": "Create Transfer",
@@ -5795,6 +16026,54 @@ export const EMBEDDED_SPEC = {
             },
             "description": "A successful response."
           },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "404": {
             "content": {
               "application/json": {
@@ -5805,12 +16084,61 @@ export const EMBEDDED_SPEC = {
             },
             "description": "We were unable to locate a transfer for the requested domain."
           },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "TLD not supported.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnprocessableEntity422"
+                },
+                "examples": {
+                  "tldNotSupported": {
+                    "summary": "TLD not supported",
+                    "value": {
+                      "message": "Unsupported TLD"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limit has been exceeded.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -5825,14 +16153,100 @@ export const EMBEDDED_SPEC = {
             }
           },
           "500": {
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
                 }
               }
-            },
-            "description": "A server error occurred."
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "Get Transfer",
@@ -5843,7 +16257,7 @@ export const EMBEDDED_SPEC = {
     },
     "/core/v1/transfers/{domainName}:cancel": {
       "post": {
-        "description": "Cancels a pending transfer request. This can be used if the transfer was initiated in error or if the authorization code provided was incorrect. The price of the transfer will refund the amount to account credit.",
+        "description": "Cancels a pending transfer request. This can be used if the transfer was initiated in error or if the authorization code provided was incorrect.\nThe price of the transfer will refund the amount to account credit.\n\nCancelable statuses:\n- pending\n- submitting_transfer\n- pending_new_auth_code\n- pending_unlock\n- pending_registry_unlock\n- rejected\n\nNon-cancelable statuses:\n- pending_transfer\n- pending_insert\n- completed\n- failed\n- canceled\n- canceled_pending_refund\n",
         "operationId": "CancelTransfer",
         "parameters": [
           {
@@ -5856,6 +16270,18 @@ export const EMBEDDED_SPEC = {
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "description": "No fields are accepted. Send an empty JSON object `{}` with `Content-Type: application/json`.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmptyObject"
+              },
+              "example": {}
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {
@@ -5875,7 +16301,55 @@ export const EMBEDDED_SPEC = {
                   "$ref": "#/components/schemas/GenericError500"
                 },
                 "example": {
-                  "message": "A transfer for this domain has already been canceled"
+                  "message": "A transfer for this domain has already been canceled."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
                 }
               }
             }
@@ -5889,6 +16363,39 @@ export const EMBEDDED_SPEC = {
               }
             },
             "description": "We were unable to locate a cancelable transfer for the requested domain."
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Response returned when the transfer cannot be canceled due to its current processing state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericConflict409"
+                },
+                "example": {
+                  "message": "A transfer for this domain is already processing and cannot be canceled at this time."
+                }
+              }
+            }
           },
           "415": {
             "description": "All POST, PUT, PATCH requests for this API must include the `Content-Type: application/json` header in the requests.",
@@ -5905,7 +16412,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -5920,17 +16438,950 @@ export const EMBEDDED_SPEC = {
             }
           },
           "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Cancel Transfer",
+        "tags": [
+          "Transfers"
+        ]
+      }
+    },
+    "/core/v1/transfers/external/out/{domainName}:cancel": {
+      "post": {
+        "description": "Cancels an outbound transfer for the given domain. Use this when the domain is being transferred out of name.com (losing registrar) to another (gaining) registrar and the registrant or reseller wants to cancel that transfer.\nOn success, subscribers receive `domain.transfer_out.status_change` with status `canceled`.\nThe endpoint validates that the domain exists and belongs to the authenticated account. Only domains in a pending transfer (out) state can be canceled.",
+        "operationId": "CancelOutboundTransfer",
+        "parameters": [
+          {
+            "description": "DomainName is the domain whose transfer out should be canceled.",
+            "in": "path",
+            "name": "domainName",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "example.com"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "No fields are accepted. Send an empty JSON object `{}` with `Content-Type: application/json`.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmptyObject"
+              },
+              "example": {}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transfer out canceled successfully. Returns the domain name and updated status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelTransferOutResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Domain does not exist or does not belong to the authenticated account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Domain is not in a pending transfer (out) state and cannot be canceled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericConflict409"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "All POST, PUT, PATCH requests for this API must include the `Content-Type: application/json` header in the requests.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnsupportedMedia415"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The domain TLD does not support canceling an outbound transfer via losing-registrar explicit deny (EPP reject). Pending outbound transfers expire if they are not completed within the registry policy timeframe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnprocessableEntity422"
+                },
+                "examples": {
+                  "tldDoesNotSupportExplicitReject": {
+                    "summary": "TLD does not support explicit outbound transfer reject",
+                    "value": {
+                      "message": "This domain TLD does not support canceling an outbound transfer via losing-registrar explicit deny (EPP reject). Pending outbound transfers expire if they are not completed within the registry policy timeframe."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit has been exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "x-ratelimit-reset": {
+                "description": "Unix timestamp for the time at which the current rate limit will reset.",
+                "schema": {
+                  "type": "number",
+                  "example": 1747668270
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/GenericError500"
                 }
               }
-            },
-            "description": "An internal server error occurred."
+            }
+          },
+          "502": {
+            "description": "The registry rejected the cancel command (e.g. registry unavailable or reject failed).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadGateway502"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
+                }
+              }
+            }
           }
         },
-        "summary": "Cancel Transfer",
+        "summary": "Cancel external transfer out",
+        "tags": [
+          "Transfers"
+        ]
+      }
+    },
+    "/core/v1/transfers/internal/in": {
+      "post": {
+        "description": "Pulls a domain from another [name.com](https://www.name.com) account into your reseller (gaining) account using a valid authorization code. This is an **internal** name.com-to-name.com move; it is separate from [Create Transfer](/api/v1/reference/transfers/create-transfer), which brings domains in from **external** registrars.\nCheck if a TLD is eligible for internal transfer in by calling [Tld Requirements](/api/v1/reference/domaininfo/requirementsV2) for the TLD and checking property `supportsInternalTransfer`.\nThis API is only available to approved reseller accounts. Contact name.com support to request access.\n#### Losing account (dashboard only)\nThe party that holds the domain today must use the name.com dashboard on the **losing** account to **unlock** the domain (remove registrar transfer lock) and to **copy the authorization code** to provide to your integration. This endpoint does not unlock the domain or retrieve the auth code for the losing account.\n#### Gaining account (this API)\nCall this endpoint with `domainName`, `authCode`, and optional `contacts` using the **gaining** reseller's API credentials.\n#### Contacts and post-transfer lock\nIf `contacts` is omitted, the gaining account's default contacts are applied. If `contacts` is provided, any roles included in the request are applied and omitted roles use the gaining account's default contacts (same pattern as [Create Domain](/api/v1/reference/domains/create-domain) and [Set Contacts](/api/v1/reference/domains/set-contacts)). The 60-day contact-change transfer lock is enforced based on the **gaining** account's settings, consistent with Set Contacts.\n#### Access\nRestricted to approved enterprise resellers; other callers receive `403 Forbidden`.",
+        "operationId": "CreateInternalTransferIn",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInternalTransferInRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The domain was accepted into the gaining account. The response body matches the domain resource representation used elsewhere in the API (same shape as Get Domain / Set Contacts).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DomainResponsePayload"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (missing or invalid fields, invalid authorization code, or other bad input). The `message` and `details` fields describe what to correct.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidArgument400"
+                },
+                "examples": {
+                  "missingAuthCode": {
+                    "summary": "Missing auth code",
+                    "value": {
+                      "message": "Bad Request",
+                      "details": "'authCode' is required"
+                    }
+                  },
+                  "invalidAuthCode": {
+                    "summary": "Invalid authorization code",
+                    "value": {
+                      "message": "Bad Request",
+                      "details": "The authorization code is invalid or has expired."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden — for example, when the authenticated account is not allowlisted for internal transfers (enterprise-only; initial rollout is limited to designated partners), or when the caller otherwise lacks permission to use this operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The domain could not be found for an internal transfer from another name.com account, or it is not eligible to be pulled into the gaining account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound404"
+                },
+                "examples": {
+                  "domainNotFound": {
+                    "summary": "Domain not found for internal transfer",
+                    "value": {
+                      "message": "Not Found",
+                      "details": "No eligible domain was found in another name.com account for this request."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The domain is in a state that blocks the operation — for example, **registrar transfer lock** is still active (`clientTransferProhibited` or equivalent). The losing account must remove transfer lock in the name.com dashboard before retrying.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericConflict409"
+                },
+                "examples": {
+                  "transferLockActive": {
+                    "summary": "Registrar transfer lock still enabled",
+                    "value": {
+                      "message": "Conflict",
+                      "details": "The domain is locked for transfer at the registrar. Unlock the domain in the losing account's name.com dashboard, then retry."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "POST requests must include `Content-Type: application/json`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnsupportedMedia415"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit has been exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "x-ratelimit-reset": {
+                "description": "Unix timestamp for the time at which the current rate limit will reset.",
+                "schema": {
+                  "type": "number",
+                  "example": 1747668270
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create Internal Transfer In",
+        "tags": [
+          "Transfers"
+        ]
+      }
+    },
+    "/core/v1/transfers/eligibility/{domainName}": {
+      "get": {
+        "description": "Returns whether a domain is currently registered at [name.com](https://www.name.com) and whether the TLD supports internal transfer between name.com accounts. Use this to decide whether to send your user through the [Create Transfer](/api/v1/reference/transfers/create-transfer) external transfer flow or the [Create Internal Transfer In](/api/v1/reference/transfers/create-internal-transfer-in) flow before initiating a transfer-in.\n\n#### Response semantics\n\n`atName` is `true` if the domain is currently registered at name.com in any account. This information is also publicly available via RDAP.\n\n`supportsInternalTransfer` mirrors the TLD-level value returned by [Tld Requirements](/api/v1/reference/domain-info/get-specific-tld-requirements). It indicates whether the TLD is eligible for internal transfer between name.com accounts. It does not reflect per-account allowlist eligibility — if your account is not allowlisted for internal transfer in, calling [Create Internal Transfer In](/api/v1/reference/transfers/create-internal-transfer-in) will return `403 Forbidden`.\n\n#### Privacy\n\nThis endpoint never reveals which account a domain is in. To check whether a domain is in your own account, use [Get Domain](/api/v1/reference/domains/get-domain) instead.",
+        "operationId": "GetTransferEligibility",
+        "parameters": [
+          {
+            "description": "The domain to check transfer eligibility for. Punycode is normalized server-side, so either ASCII or UTF-8 is accepted.",
+            "in": "path",
+            "name": "domainName",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferEligibilityResponse"
+                },
+                "examples": {
+                  "domainAtNamecomInternalTransferSupported": {
+                    "summary": "Domain is at name.com and TLD supports internal transfer",
+                    "value": {
+                      "domainName": "example.com",
+                      "atName": true,
+                      "supportsInternalTransfer": true
+                    }
+                  },
+                  "domainAtExternalRegistrar": {
+                    "summary": "Domain is at an external registrar",
+                    "value": {
+                      "domainName": "example.com",
+                      "atName": false,
+                      "supportsInternalTransfer": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (invalid domain name, or domain SLD does not meet the TLD's length requirements).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidArgument400"
+                },
+                "examples": {
+                  "invalidDomainName": {
+                    "summary": "Invalid domain name",
+                    "value": {
+                      "message": "Invalid Domain Name"
+                    }
+                  },
+                  "sldLengthViolation": {
+                    "summary": "SLD length requirements not met",
+                    "value": {
+                      "message": "The domain doesn't appear to meet the length requirements for the specified tld."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "TLD not supported.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnprocessableEntity422"
+                },
+                "examples": {
+                  "tldNotSupported": {
+                    "summary": "TLD not supported",
+                    "value": {
+                      "message": "Unsupported Tld"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit has been exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "x-ratelimit-reset": {
+                "description": "Unix timestamp for the time at which the current rate limit will reset.",
+                "schema": {
+                  "type": "number",
+                  "example": 1747668270
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get Transfer Eligibility",
         "tags": [
           "Transfers"
         ]
@@ -5943,13 +17394,14 @@ export const EMBEDDED_SPEC = {
         "parameters": [
           {
             "name": "tld",
-            "description": "TLD indicates which domain requirements to retrieve (without the dot prefix, e.g., 'fr' for .fr domains).",
+            "description": "TLD indicates which domain requirements to retrieve (without the dot prefix, e.g., 'fr' for .fr domains). For punycode TLDs, use the ASCII version instead of the UTF-8. So for the `онлайн` TLD, you would submit `xn--80asehdb`.",
             "in": "path",
+            "required": true,
             "schema": {
               "type": "string",
-              "example": "fr"
-            },
-            "required": true
+              "example": "fr",
+              "pattern": "^((?!xn--)[a-z0-9-]{1,63}|xn--[a-z0-9-]{1,63})((?:\\.(?!-)[a-z0-9-]{1,63})|(?:\\.xn--[a-z0-9-]{1,63}))*$"
+            }
           }
         ],
         "responses": {
@@ -5971,6 +17423,7 @@ export const EMBEDDED_SPEC = {
                         "supportsDnssec": true,
                         "supportsPremium": true,
                         "supportsPrivacy": true,
+                        "supportsInternalTransfer": true,
                         "requiresPreDelegation": true,
                         "expirationGracePeriod": 3,
                         "idnLanguages": {},
@@ -5988,7 +17441,320 @@ export const EMBEDDED_SPEC = {
                         ],
                         "hsts": false,
                         "minDomainLength": 5,
-                        "minIdnDomainLength": 5
+                        "minIdnDomainLength": 5,
+                        "registryOperator": "registryfr",
+                        "claimsCheckRequired": [],
+                        "requireIdnSld": false
+                      },
+                      "contacts": {
+                        "description": "The contacts required to be submitted for registration",
+                        "type": "string",
+                        "required": true,
+                        "label": "contacts",
+                        "fields": {
+                          "registrant": {
+                            "description": "Registrant contact requirements",
+                            "type": "string",
+                            "required": true,
+                            "fields": {
+                              "firstName": {
+                                "description": "First name of registrant contact",
+                                "type": "string",
+                                "required": true
+                              },
+                              "lastName": {
+                                "description": "Last name of registrant contact",
+                                "type": "string",
+                                "required": true
+                              },
+                              "address1": {
+                                "description": "First part of mailing address",
+                                "type": "string",
+                                "required": true
+                              },
+                              "address2": {
+                                "description": "Second part of mailing address",
+                                "type": "string",
+                                "required": false
+                              },
+                              "companyName": {
+                                "description": "Company name of registrant contact",
+                                "type": "string",
+                                "required": false
+                              },
+                              "phone": {
+                                "description": "Phone number of registrant contact",
+                                "type": "string",
+                                "required": true
+                              },
+                              "fax": {
+                                "description": "Fax number of registrant contact",
+                                "type": "string",
+                                "required": false
+                              },
+                              "email": {
+                                "description": "Email address of registrant contact",
+                                "type": "string",
+                                "required": true,
+                                "validation": "valid_email"
+                              },
+                              "city": {
+                                "description": "City of registrant contact",
+                                "type": "string",
+                                "required": true
+                              },
+                              "state": {
+                                "description": "State/Province of registrant. Only values from this list are allowed",
+                                "type": "string",
+                                "required": true
+                              },
+                              "zip": {
+                                "description": "Postal code of registrant contact",
+                                "type": "string",
+                                "required": true
+                              },
+                              "country": {
+                                "description": "Country of registrant, only options in this list are allowed",
+                                "type": "enum",
+                                "required": true,
+                                "options": [
+                                  {
+                                    "value": "AT",
+                                    "label": "Austria"
+                                  },
+                                  {
+                                    "value": "AX",
+                                    "label": "Åland Islands"
+                                  },
+                                  {
+                                    "value": "BE",
+                                    "label": "Belgium"
+                                  },
+                                  {
+                                    "value": "BG",
+                                    "label": "Bulgaria"
+                                  },
+                                  {
+                                    "value": "CH",
+                                    "label": "Switzerland"
+                                  },
+                                  {
+                                    "value": "CY",
+                                    "label": "Cyprus"
+                                  },
+                                  {
+                                    "value": "CZ",
+                                    "label": "Czech Republic"
+                                  },
+                                  {
+                                    "value": "DE",
+                                    "label": "Germany"
+                                  },
+                                  {
+                                    "value": "DK",
+                                    "label": "Denmark"
+                                  },
+                                  {
+                                    "value": "EE",
+                                    "label": "Estonia"
+                                  },
+                                  {
+                                    "value": "ES",
+                                    "label": "Spain"
+                                  },
+                                  {
+                                    "value": "FI",
+                                    "label": "Finland"
+                                  },
+                                  {
+                                    "value": "FR",
+                                    "label": "France"
+                                  },
+                                  {
+                                    "value": "GF",
+                                    "label": "Guiana"
+                                  },
+                                  {
+                                    "value": "GP",
+                                    "label": "Guadeloupe"
+                                  },
+                                  {
+                                    "value": "GR",
+                                    "label": "Greece"
+                                  },
+                                  {
+                                    "value": "HU",
+                                    "label": "Hungary"
+                                  },
+                                  {
+                                    "value": "IE",
+                                    "label": "Ireland"
+                                  },
+                                  {
+                                    "value": "IS",
+                                    "label": "Iceland"
+                                  },
+                                  {
+                                    "value": "IT",
+                                    "label": "Italy"
+                                  },
+                                  {
+                                    "value": "LI",
+                                    "label": "Liechtenstein"
+                                  },
+                                  {
+                                    "value": "LT",
+                                    "label": "Lithuania"
+                                  },
+                                  {
+                                    "value": "LU",
+                                    "label": "Luxembourg"
+                                  },
+                                  {
+                                    "value": "LV",
+                                    "label": "Latvia"
+                                  },
+                                  {
+                                    "value": "MQ",
+                                    "label": "Martinique"
+                                  },
+                                  {
+                                    "value": "MT",
+                                    "label": "Malta"
+                                  },
+                                  {
+                                    "value": "NC",
+                                    "label": "New Caledonia"
+                                  },
+                                  {
+                                    "value": "NL",
+                                    "label": "Netherlands"
+                                  },
+                                  {
+                                    "value": "NO",
+                                    "label": "Norway"
+                                  },
+                                  {
+                                    "value": "PF",
+                                    "label": "Polynesia (French)"
+                                  },
+                                  {
+                                    "value": "PL",
+                                    "label": "Poland"
+                                  },
+                                  {
+                                    "value": "PM",
+                                    "label": "St. Pierre & Miquelon"
+                                  },
+                                  {
+                                    "value": "PT",
+                                    "label": "Portugal"
+                                  },
+                                  {
+                                    "value": "RE",
+                                    "label": "Reunion"
+                                  },
+                                  {
+                                    "value": "RO",
+                                    "label": "Romania"
+                                  },
+                                  {
+                                    "value": "SE",
+                                    "label": "Sweden"
+                                  },
+                                  {
+                                    "value": "SI",
+                                    "label": "Slovenia"
+                                  },
+                                  {
+                                    "value": "SK",
+                                    "label": "Slovakia"
+                                  },
+                                  {
+                                    "value": "TF",
+                                    "label": "French Southern and Antarctic Lands"
+                                  },
+                                  {
+                                    "value": "WF",
+                                    "label": "Wallis & Futuna Is."
+                                  },
+                                  {
+                                    "value": "YT",
+                                    "label": "Mayotte"
+                                  }
+                                ]
+                              }
+                            }
+                          },
+                          "tech": {
+                            "description": "Technical contact requirements",
+                            "type": "string",
+                            "required": true,
+                            "fields": {
+                              "firstName": {
+                                "description": "First name of tech contact",
+                                "type": "string",
+                                "required": true
+                              },
+                              "lastName": {
+                                "description": "Last name of tech contact",
+                                "type": "string",
+                                "required": true
+                              },
+                              "address1": {
+                                "description": "First part of mailing address",
+                                "type": "string",
+                                "required": true
+                              },
+                              "address2": {
+                                "description": "Second part of mailing address",
+                                "type": "string",
+                                "required": false
+                              },
+                              "companyName": {
+                                "description": "Required company name of tech contact",
+                                "type": "string",
+                                "required": true
+                              },
+                              "phone": {
+                                "description": "Phone number of tech contact",
+                                "type": "string",
+                                "required": true
+                              },
+                              "fax": {
+                                "description": "Fax number of tech contact",
+                                "type": "string",
+                                "required": false
+                              },
+                              "email": {
+                                "description": "Email address of tech contact",
+                                "type": "string",
+                                "required": true,
+                                "validation": "valid_email"
+                              },
+                              "city": {
+                                "description": "City of tech contact",
+                                "type": "string",
+                                "required": true
+                              },
+                              "state": {
+                                "description": "State/Province of tech contact. Only values from this list are allowed",
+                                "type": "string",
+                                "required": true
+                              },
+                              "zip": {
+                                "description": "Postal code of tech contact",
+                                "type": "string",
+                                "required": true
+                              },
+                              "country": {
+                                "description": "Country of tech contact",
+                                "type": "enum",
+                                "required": true
+                              }
+                            }
+                          }
+                        }
                       },
                       "requirements": {
                         "description": "Registration requirements for .fr domains",
@@ -6289,6 +18055,7 @@ export const EMBEDDED_SPEC = {
                         "supportsDnssec": true,
                         "supportsPremium": true,
                         "supportsPrivacy": true,
+                        "supportsInternalTransfer": true,
                         "requiresPreDelegation": true,
                         "expirationGracePeriod": 25,
                         "hsts": false,
@@ -6317,7 +18084,17 @@ export const EMBEDDED_SPEC = {
                           8,
                           9,
                           10
-                        ]
+                        ],
+                        "registryOperator": "centralnic",
+                        "claimsCheckRequired": [],
+                        "requireIdnSld": false
+                      },
+                      "contacts": {
+                        "description": "The contacts required to be submitted for registration",
+                        "type": "string",
+                        "required": true,
+                        "label": "contacts",
+                        "fields": {}
                       },
                       "requirements": {
                         "description": "Registration requirements for .security domains",
@@ -6344,6 +18121,7 @@ export const EMBEDDED_SPEC = {
                         "supportsDnssec": true,
                         "supportsPremium": false,
                         "supportsPrivacy": false,
+                        "supportsInternalTransfer": false,
                         "requiresPreDelegation": false,
                         "expirationGracePeriod": 3,
                         "hsts": true,
@@ -6361,7 +18139,17 @@ export const EMBEDDED_SPEC = {
                           8,
                           9,
                           10
-                        ]
+                        ],
+                        "registryOperator": "nicat",
+                        "claimsCheckRequired": [],
+                        "requireIdnSld": false
+                      },
+                      "contacts": {
+                        "description": "The contacts required to be submitted for registration",
+                        "type": "string",
+                        "required": true,
+                        "label": "contacts",
+                        "fields": {}
                       },
                       "requirements": {
                         "description": "Registration requirements for .at domains",
@@ -6381,6 +18169,64 @@ export const EMBEDDED_SPEC = {
             },
             "description": "The complete registration requirements for the specified TLD."
           },
+          "400": {
+            "description": "Bad request - Invalid TLD format.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidArgument400"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "404": {
             "description": "Tld not found.",
             "content": {
@@ -6391,12 +18237,61 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "TLD not supported.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnprocessableEntity422"
+                },
+                "examples": {
+                  "tldNotSupported": {
+                    "summary": "TLD not supported",
+                    "value": {
+                      "message": "Unsupported TLD"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limit has been exceeded.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -6409,6 +18304,102 @@ export const EMBEDDED_SPEC = {
                 }
               }
             }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "Get Specific TLD Requirements",
@@ -6417,9 +18408,305 @@ export const EMBEDDED_SPEC = {
         ]
       }
     },
+    "/core/v1/domaininfo/claims/{domain}": {
+      "post": {
+        "summary": "Check Domain Claims",
+        "description": "Performs the actual claims check for a specific domain. This endpoint checks if a specific domain has trademark claims against it, returning detailed information about any matching trademarks and their holders. Use this to verify if a domain can be registered without trademark conflicts. Please see the [claims flow](/guides/claims-flow) for information on how to use this endpoint in your domain purchase flow.",
+        "operationId": "CheckDomainClaims",
+        "parameters": [
+          {
+            "name": "domain",
+            "description": "The domain name to check for trademark claims (e.g., 'tiktok.page', 'example.com'). Include the full domain name including the TLD.",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "tiktok.page",
+              "pattern": "^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Optional parameters for the claims check. The type defaults to 'registration' if not specified.",
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DomainClaimsCheckRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Domain claims check completed successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DomainClaimsCheckResponse"
+                },
+                "examples": {
+                  "claims_found": {
+                    "summary": "Domain with trademark claims",
+                    "description": "Example of a domain that has trademark claims against it",
+                    "value": {
+                      "domain": "tiktok.page",
+                      "claims": [],
+                      "claimsProcessActive": true,
+                      "claimId": "8c3027d30000000000382500785",
+                      "notBefore": "2020-01-01T00:00:00Z",
+                      "notAfter": "2030-01-01T00:00:00Z"
+                    }
+                  },
+                  "no_claims_found": {
+                    "summary": "Domain without trademark claims",
+                    "description": "Example of a domain that has no trademark claims against it",
+                    "value": {
+                      "domain": "mycompany.page",
+                      "claims": [],
+                      "claimsProcessActive": false,
+                      "claimId": null,
+                      "notBefore": null,
+                      "notAfter": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid domain format or parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidArgument400"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Domain not found or TLD not supported for claims checking.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "All POST, PUT, PATCH requests for this API must include the `Content-Type: application/json` header in the requests.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnsupportedMedia415"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit has been exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "x-ratelimit-reset": {
+                "description": "Unix timestamp for the time at which the current rate limit will reset.",
+                "schema": {
+                  "type": "number",
+                  "example": 1747668270
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Domain Info"
+        ]
+      }
+    },
     "/core/v1/tldpricing": {
       "get": {
-        "description": "Get an alphabetical pricing list of all TLDs supported by name.com. The pricing returned will be your account level price in US Dollars (USD) and is the price you pay for non-premium registrations.\n\n**Please Note:** This is general pricing for domains registered with the specified TLD. Individual domains may have different pricing based on a large number of factors.\nIf you are trying to see pricing for a specific individual domain, you will need to use the [GetPricingForDomain](https://docs.name.com/api-spec-cdn/namecom.api/domains/getpricingfordomain) endpoint.\n\nPlease note that if `null` is returned for any of the prices, it means that particular product is unavailable at name.com at the time of the request.\nFor example, if `registrationPrice` returns as `null` in the response, it means that name.com is not currently accepting registrations for that TLD.\n\nAny IDN TLDs will return in their unicode format.\n",
+        "description": "This endpoint returns an alphabetical list of all TLDs supported by name.com, including pricing for each supported order type. All prices are in US Dollars (USD) and apply to non-premium domains. name.com provides three pricing types for each TLD:\n- Account-Level Pricing - Your price, including any applicable rebates, promotions, or account-level discounts. This is referenced as 'registrationprice', 'renewalprice', 'transferinprice' and 'domainrestorationprice' in this endpoint.\n- Original Pricing (No Discounts Applied) - The suggested retail price (MSRP) before any discounts are applied.\n- Retail Pricing (Public Site Pricing) - The current public retail price on name.com, including any public rebates or promotions, but before any account-level discounts.\n\n**Important Notes:**\n- Promo codes are not supported through the API, and therefore are not reflected in any pricing values returned.\n- General TLD pricing only: This represents standard pricing for domains registered under the specified TLD. Pricing for specific domains may differ based on multiple factors (e.g., premium classifications, registry pricing rules). To retrieve pricing for an individual domain, use the GetPricingForDomain endpoint.\n- Availability: If a pricing value is returned as null, that product type is not currently supported for the TLD. (Example: registrationPrice = null means registrations are not currently available.)\n- If you do not have account level pricing, the retail price will always match your account level price. (e.g., registration price = registration retail price)\n",
         "operationId": "TldPriceList",
         "parameters": [
           {
@@ -6427,9 +18714,14 @@ export const EMBEDDED_SPEC = {
             "in": "query",
             "name": "perPage",
             "schema": {
-              "format": "int32",
-              "type": "integer",
-              "default": 25
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/PerPageLimit"
+                },
+                {
+                  "default": 25
+                }
+              ]
             }
           },
           {
@@ -6439,7 +18731,8 @@ export const EMBEDDED_SPEC = {
             "schema": {
               "format": "int32",
               "type": "integer",
-              "default": 1
+              "default": 1,
+              "minimum": 1
             }
           },
           {
@@ -6448,7 +18741,7 @@ export const EMBEDDED_SPEC = {
             "required": false,
             "in": "query",
             "schema": {
-              "type": "number",
+              "type": "integer",
               "format": "int32",
               "minimum": 1,
               "maximum": 10,
@@ -6466,7 +18759,8 @@ export const EMBEDDED_SPEC = {
               "minItems": 1,
               "maxItems": 25,
               "items": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1
               },
               "example": [
                 "com",
@@ -6489,12 +18783,101 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
+          "400": {
+            "description": "Bad request - Invalid query parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidArgument400"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limit has been exceeded.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -6513,7 +18896,93 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -6527,7 +18996,7 @@ export const EMBEDDED_SPEC = {
     },
     "/core/v1/zonecheck": {
       "post": {
-        "description": "Zone Check offers a rapid, preliminary check for domain availability by leveraging cached zone file data.  Ideal for large-batch queries, it provides a high confidence indication of a domain's availability significantly faster than live registry checks.  For definitive, real-time availability and pricing, you can follow up with the standard Check Availability call.\nThe API first validates each submitted domain. Invalid domains are filtered out, and their count is returned in the removed field of the response.  If no valid domains remain after this process, the API returns a `400 Bad Request` response.\n**Note:** The cached zone files used for this check are refreshed twice daily based on the latest available data from the registries.",
+        "description": "Zone Check offers a rapid, preliminary check for domain availability by leveraging cached zone file data.  Ideal for large-batch queries, it provides a high confidence indication of a domain's availability significantly faster than live registry checks.  For definitive, real-time availability and pricing, you can follow up with the standard [Check Availability](/api/v1/reference/domains/check-availability) call.\nThe API normalizes and validates each submitted domain string. Domains that fail validation, use an unsupported TLD for this service, or  are otherwise not eligible for zone check are **removed** from the request before the zone file lookup runs. The response includes **only**  a numeric count of removed domains (`removed`); individual removed strings are not returned. A future API version may extend the contract to  include details about removed domains.\n\nFor the best results and to avoid `400 Bad Request` errors after cleaning, ensure each domain string meets the criteria described for  `domainNames` in the request body schema.\n\nIf no valid domains remain after this process, the API returns a `400 Bad Request` response.\n**Note:** The cached zone files used for this check are refreshed twice daily based on the latest available data from the registries.",
         "operationId": "ZoneCheck",
         "summary": "Zone Check",
         "tags": [
@@ -6565,6 +19034,74 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "415": {
             "description": "All POST, PUT, PATCH requests for this API must include the `Content-Type: application/json` header in the requests.",
             "content": {
@@ -6590,7 +19127,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -6609,7 +19157,25 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
                 }
               }
             }
@@ -6620,6 +19186,54 @@ export const EMBEDDED_SPEC = {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/BadGateway502"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -6651,17 +19265,83 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Unauthorized401"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
                 }
               }
             }
           },
           "403": {
-            "description": "Only authorized accounts have access to this endpoint. To request access, please contact our support team.",
+            "description": "Forbidden - you do not have permission to perform this action.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericForbidden403"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No premium list is currently available for download.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound404"
+                },
+                "examples": {
+                  "noPremiumList": {
+                    "summary": "No premium list available",
+                    "value": {
+                      "message": "No premium list is currently available for download."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
                 }
               }
             }
@@ -6671,7 +19351,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -6690,7 +19381,93 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -6700,7 +19477,7 @@ export const EMBEDDED_SPEC = {
     },
     "/core/v1/contacts/unverified": {
       "get": {
-        "description": "Returns a list of contacts, related to domains within your account, that require verification as per ICANN procedures.\nWhen a new domain is created, unverified contacts are not immediately available in API responses.  Records are added by a scheduled process that runs approximately every 10 minutes.  As a result, there may be up to a 10-minute delay before unverified contacts appear in the API. This delay also applies to related events such as webhooks or other downstream systems that depend on contact verification data. \nThis API is only available to approved reseller accounts. Contact name.com support to request access.",
+        "description": "Returns a list of contacts, related to domains within your account, that require verification as per ICANN procedures.\nWhen a new domain is created, unverified contacts are not immediately available in API responses.  Records are added by a scheduled process that runs approximately every 10 minutes.  As a result, there may be up to a 10-minute delay before unverified contacts appear in the API. This delay also applies to related events such as webhooks or other downstream systems that depend on contact verification data. ",
         "operationId": "UnverifiedContactsList",
         "summary": "List Unverified Contacts",
         "tags": [
@@ -6712,11 +19489,15 @@ export const EMBEDDED_SPEC = {
             "in": "query",
             "name": "perPage",
             "schema": {
-              "format": "int32",
-              "type": "integer",
-              "example": 100,
-              "default": 100,
-              "minimum": 1
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/PerPageLimit"
+                },
+                {
+                  "default": 100,
+                  "example": 100
+                }
+              ]
             }
           },
           {
@@ -6743,22 +19524,80 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
+          "400": {
+            "description": "Bad request - Invalid query parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidArgument400"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Unauthorized401"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
                 }
               }
             }
           },
           "403": {
-            "description": "Only authorized accounts have access to this endpoint. To request access, please contact our support team.",
+            "description": "Forbidden - you do not have permission to perform this action.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericForbidden403"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
                 }
               }
             }
@@ -6768,7 +19607,18 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -6787,7 +19637,93 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -6826,6 +19762,18 @@ export const EMBEDDED_SPEC = {
             "required": false
           }
         ],
+        "requestBody": {
+          "required": true,
+          "description": "No fields are accepted. Send an empty JSON object `{}` with `Content-Type: application/json`.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmptyObject"
+              },
+              "example": {}
+            }
+          }
+        },
         "responses": {
           "204": {
             "description": "Contact has been successfully verified."
@@ -6835,17 +19783,45 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Unauthorized401"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
                 }
               }
             }
           },
           "403": {
-            "description": "Only authorized accounts have access to this endpoint. To request access, please contact our support team.",
+            "description": "Forbidden - you do not have permission to perform this action.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericForbidden403"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
                 }
               }
             }
@@ -6856,6 +19832,26 @@ export const EMBEDDED_SPEC = {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
                 }
               }
             }
@@ -6876,12 +19872,33 @@ export const EMBEDDED_SPEC = {
               }
             }
           },
+          "415": {
+            "description": "All POST, PUT, PATCH requests for this API must include the `Content-Type: application/json` header in the requests.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnsupportedMedia415"
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limit has been exceeded.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TooManyRequests429"
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
                 }
               }
             },
@@ -6900,7 +19917,878 @@ export const EMBEDDED_SPEC = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericError500"
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/core/v1/contacts/verify/{verificationId}:resend": {
+      "post": {
+        "description": "Resend the contact verification email for a pending verification record.\n\n### Throttling\nThis endpoint enforces strict throttling to prevent abuse:\n- Per `verificationId`: max 1 resend per 15 minutes\n- Per reseller account: max 200 resends per rolling hour\n\n`nextEligibleAt` is always returned so the client knows when it can try again.\n\nOn `429`, the response uses the standard error envelope, and `details` contains the earliest retry time (RFC3339 UTC).",
+        "summary": "Resend Contact Verification Email",
+        "operationId": "ResendContactVerificationEmail",
+        "tags": [
+          "Contact Verification"
+        ],
+        "parameters": [
+          {
+            "description": "The verificationId for the pending contact verification record.",
+            "in": "path",
+            "name": "verificationId",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            },
+            "required": true,
+            "example": 98752463
+          },
+          {
+            "name": "X-Idempotency-Key",
+            "in": "header",
+            "description": "A unique string (e.g., a UUID v4) to make the request idempotent. This key ensures that if the request is retried, the operation will not be performed multiple times. Subsequent requests with the same key will return the original result.",
+            "schema": {
+              "type": "string",
+              "example": "083910ef-04e4-4bd1-a0bf-3737fe005ca8"
+            },
+            "required": false
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "No fields are accepted. Send an empty JSON object `{}` with `Content-Type: application/json`.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmptyObject"
+              },
+              "example": {}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Request accepted. An email may have been sent, or the request may be a no-op (for example, if the contact is already verified or there is nothing to send). The `sent` field indicates whether an email was sent for this request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactVerificationResendResponse"
+                },
+                "examples": {
+                  "sent": {
+                    "summary": "Email sent",
+                    "value": {
+                      "sent": true,
+                      "verificationId": 98752463,
+                      "nextEligibleAt": "2026-01-14T12:15:00Z"
+                    }
+                  },
+                  "noop": {
+                    "summary": "No-op (already verified / nothing to send)",
+                    "value": {
+                      "sent": false,
+                      "verificationId": 98752463,
+                      "nextEligibleAt": "2026-01-14T12:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The submitted verificationId was not found or is not associated with this account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "When sending idempotent requests, this response indicates that there was an issue with the idempotency keys.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Idempotency key has been reused for a different request."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "All POST, PUT, PATCH requests for this API must include the `Content-Type: application/json` header in the requests.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnsupportedMedia415"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Throttled. The response uses the standard error envelope; `details` contains the earliest retry time (RFC3339 UTC).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Resend throttled"
+                    },
+                    "details": {
+                      "type": "string",
+                      "description": "Earliest retry time (RFC3339 UTC).",
+                      "example": "Next eligible at: 2026-01-20T21:49:58+00:00"
+                    }
+                  }
+                },
+                "examples": {
+                  "throttled": {
+                    "summary": "Throttled",
+                    "value": {
+                      "message": "Resend throttled",
+                      "details": "Next eligible at: 2026-01-20T21:49:58+00:00"
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "x-ratelimit-reset": {
+                "description": "Unix timestamp for the time at which the current rate limit will reset.",
+                "schema": {
+                  "type": "number",
+                  "example": 1747668270
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/core/v1/domaininfo/requirementsV2/{tld}": {
+      "get": {
+        "summary": "Get TLD Requirements as JSON Schema",
+        "description": "Returns the registration requirements as a JSON Schema (Draft 7) document. This endpoint is designed for form generation and validation libraries that consume JSON Schema directly.",
+        "operationId": "GetTldRequirementsV2",
+        "tags": [
+          "Domain Info"
+        ],
+        "parameters": [
+          {
+            "name": "tld",
+            "description": "TLD indicates which domain requirements to retrieve (without the dot prefix, e.g., 'fr' for .fr domains). For punycode TLDs, use the ASCII version instead of the UTF-8. So for the `онлайн` TLD, you would submit `xn--80asehdb`.",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "fr",
+              "pattern": "^((?!xn--)[a-z0-9-]{1,63}|xn--[a-z0-9-]{1,63})((?:\\.(?!-)[a-z0-9-]{1,63})|(?:\\.xn--[a-z0-9-]{1,63}))*$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JSON Schema document describing TLD registration requirements.",
+            "content": {
+              "application/schema+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequirementsJsonSchema"
+                },
+                "examples": {
+                  "it_tld_schema": {
+                    "summary": "Example for .it TLD",
+                    "value": {
+                      "$schema": "http://json-schema.org/draft-07/schema#",
+                      "type": "object",
+                      "title": ".it Domain Registration Requirements Schema",
+                      "description": "Registration requirements for .it domains",
+                      "properties": {
+                        "tldInfo": {
+                          "tld": ".it",
+                          "ccTld": true,
+                          "supportsTransferLock": true,
+                          "supportsDnssec": true,
+                          "supportsPremium": false,
+                          "supportsPrivacy": false,
+                          "supportsInternalTransfer": true,
+                          "requiresPreDelegation": false,
+                          "expirationGracePeriod": 25,
+                          "allowedRegistrationYears": [
+                            1,
+                            3,
+                            5,
+                            8,
+                            10
+                          ],
+                          "idnLanguages": {
+                            "IT": "Italian"
+                          },
+                          "hsts": false,
+                          "minDomainLength": 3,
+                          "minIdnDomainLength": 5,
+                          "registryOperator": "nic.it",
+                          "claimsCheckRequired": [],
+                          "requireIdnSld": false,
+                          "readOnly": true
+                        },
+                        "contacts": {
+                          "type": "object",
+                          "properties": {
+                            "registrant": {
+                              "type": "object",
+                              "properties": {
+                                "firstName": {
+                                  "type": "string",
+                                  "title": "First Name",
+                                  "description": "First name of registrant contact"
+                                },
+                                "email": {
+                                  "type": "string",
+                                  "format": "email",
+                                  "title": "Email",
+                                  "description": "Email address of registrant contact"
+                                }
+                              },
+                              "required": [
+                                "firstName",
+                                "email"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "registrant"
+                          ]
+                        },
+                        "tldRequirements": {
+                          "type": "object",
+                          "properties": {
+                            "X-IT-ENTITY-TYPE": {
+                              "type": "string",
+                              "title": "Registrant Entity Type",
+                              "enum": [
+                                "1",
+                                "2",
+                                "3",
+                                "4",
+                                "5",
+                                "6",
+                                "7"
+                              ]
+                            },
+                            "X-IT-PIN": {
+                              "type": "string",
+                              "title": ".IT PIN number",
+                              "description": "16 alphanumeric characters (tax code) for natural persons or 11 digits (VAT number) for organizations"
+                            }
+                          }
+                        }
+                      },
+                      "required": [
+                        "tldInfo",
+                        "contacts",
+                        "tldRequirements"
+                      ]
+                    }
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequirementsJsonSchema"
+                },
+                "examples": {
+                  "it_tld_schema": {
+                    "summary": "Example for .it TLD",
+                    "value": {
+                      "$schema": "http://json-schema.org/draft-07/schema#",
+                      "type": "object",
+                      "title": ".it Domain Registration Requirements Schema",
+                      "description": "Registration requirements for .it domains",
+                      "properties": {
+                        "tldInfo": {
+                          "tld": ".it",
+                          "ccTld": true,
+                          "supportsTransferLock": true,
+                          "supportsDnssec": true,
+                          "supportsPremium": false,
+                          "supportsPrivacy": false,
+                          "supportsInternalTransfer": true,
+                          "requiresPreDelegation": false,
+                          "expirationGracePeriod": 25,
+                          "allowedRegistrationYears": [
+                            1,
+                            3,
+                            5,
+                            8,
+                            10
+                          ],
+                          "idnLanguages": {
+                            "IT": "Italian"
+                          },
+                          "hsts": false,
+                          "minDomainLength": 3,
+                          "minIdnDomainLength": 5,
+                          "registryOperator": "nic.it",
+                          "claimsCheckRequired": [],
+                          "requireIdnSld": false,
+                          "readOnly": true
+                        },
+                        "contacts": {
+                          "type": "object",
+                          "properties": {
+                            "registrant": {
+                              "type": "object",
+                              "properties": {
+                                "firstName": {
+                                  "type": "string",
+                                  "title": "First Name",
+                                  "description": "First name of registrant contact"
+                                },
+                                "email": {
+                                  "type": "string",
+                                  "format": "email",
+                                  "title": "Email",
+                                  "description": "Email address of registrant contact"
+                                }
+                              },
+                              "required": [
+                                "firstName",
+                                "email"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "registrant"
+                          ]
+                        },
+                        "tldRequirements": {
+                          "type": "object",
+                          "properties": {
+                            "X-IT-ENTITY-TYPE": {
+                              "type": "string",
+                              "title": "Registrant Entity Type",
+                              "enum": [
+                                "1",
+                                "2",
+                                "3",
+                                "4",
+                                "5",
+                                "6",
+                                "7"
+                              ]
+                            },
+                            "X-IT-PIN": {
+                              "type": "string",
+                              "title": ".IT PIN number",
+                              "description": "16 alphanumeric characters (tax code) for natural persons or 11 digits (VAT number) for organizations"
+                            }
+                          }
+                        }
+                      },
+                      "required": [
+                        "tldInfo",
+                        "contacts",
+                        "tldRequirements"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidArgument400"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - you do not have permission to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Permission denied"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error",
+                      "example": "Failed authentication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "TLD not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound404"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error",
+                      "example": "Method Not Allowed"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "TLD not supported.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnprocessableEntity422"
+                },
+                "examples": {
+                  "tldNotSupported": {
+                    "summary": "Registration price unavailable",
+                    "value": {
+                      "message": "Unsupported TLD"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit has been exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "### Too Many Requests\nYou have exceeded the rate limit.\n\n**Headers returned:**\n* 'X-RateLimit-Reset': An integer (UTC epoch) indicating when you can retry.",
+                      "example": "Rate Limit Exceeded"
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "x-ratelimit-reset": {
+                "description": "Unix timestamp for the time at which the current rate limit will reset.",
+                "schema": {
+                  "type": "number",
+                  "example": 1747668270
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Internal Server Error"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "Something went wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The server received an invalid response from the upstream server."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable — returned during scheduled maintenance when the API is offline. See https://status.name.com for updates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "Service Unavailable"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Additional context or information about the error.",
+                      "example": "The API is offline for scheduled maintenance. See https://status.name.com for updates."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "A human-readable message providing more details about the error.",
+                      "example": "The upstream server is taking too long to respond."
+                    }
+                  }
                 }
               }
             }
@@ -6916,8 +20804,20 @@ export const EMBEDDED_SPEC = {
           "Webhook Notifications"
         ],
         "operationId": "AccountCreditBalanceChangeWebhook",
-        "summary": "Webhook for credit balance changes",
+        "summary": "Account Credit Balance Change",
         "description": "This is the payload that will be sent to the subscribed URL, when a changed to the amount of account credit for an account changes. This will trigger on both increases and decreases in account credit for the account.",
+        "parameters": [
+          {
+            "name": "X-NAMECOM-SIGNATURE",
+            "in": "header",
+            "description": "HMAC signature for the request payload. See HMAC signing documentation for example code and detailed explanation of signing.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "djasfgafgflgsdfgdsfkhfhjas,12334782,1123-3423-4dss4-354"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -6932,10 +20832,83 @@ export const EMBEDDED_SPEC = {
           "200": {
             "description": "The subscribed server accepted the request."
           },
-          "4xx": {
+          "4XX": {
             "description": "The subscribed server returned an error (bad request, Unauthenticated etc)."
           },
-          "5xx": {
+          "5XX": {
+            "description": "The subscribed server experienced an error while processing the request."
+          }
+        }
+      }
+    },
+    "accountDomainRemoval": {
+      "post": {
+        "tags": [
+          "Webhook Notifications"
+        ],
+        "operationId": "AccountDomainRemovalWebhook",
+        "summary": "Account Domain Removal",
+        "description": "Sent when a domain leaves the subscribing account's inventory. Fires once per inventory-loss.",
+        "parameters": [
+          {
+            "name": "X-NAMECOM-SIGNATURE",
+            "in": "header",
+            "description": "HMAC signature for the request payload. See HMAC signing documentation for example code and detailed explanation of signing.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "djasfgafgflgsdfgdsfkhfhjas,12334782,1123-3423-4dss4-354"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The request sent to your server when a domain is removed from the account.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountDomainRemoval"
+              },
+              "examples": {
+                "expiration": {
+                  "summary": "Removed after expiration lifecycle",
+                  "value": {
+                    "eventName": "account.domain.removal",
+                    "domainName": "example.com",
+                    "reason": "expiration",
+                    "expireDate": "2026-08-15T00:00:00Z"
+                  }
+                },
+                "agp_refund": {
+                  "summary": "Removed via AGP refund",
+                  "value": {
+                    "eventName": "account.domain.removal",
+                    "domainName": "example.com",
+                    "reason": "agp_refund",
+                    "expireDate": "2027-07-01T00:00:00Z"
+                  }
+                },
+                "administrative": {
+                  "summary": "Removed administratively",
+                  "value": {
+                    "eventName": "account.domain.removal",
+                    "domainName": "example.com",
+                    "reason": "administrative",
+                    "expireDate": "2026-08-15T00:00:00Z"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The subscribed server accepted the request."
+          },
+          "4XX": {
+            "description": "The subscribed server returned an error (bad request, unauthenticated, etc)."
+          },
+          "5XX": {
             "description": "The subscribed server experienced an error while processing the request."
           }
         }
@@ -6949,6 +20922,18 @@ export const EMBEDDED_SPEC = {
         "operationId": "DomainLockStatusChangeWebhook",
         "summary": "Domain Lock Status Change",
         "description": "Sent when a domain lock is added or removed, which may restrict or lift normal operations. This event is triggered automatically whenever covered lock types (e.g., compliance or verification holds) are added or removed. A webhook payload is delivered to the subscribed endpoint, providing details about the domain and its updated status.",
+        "parameters": [
+          {
+            "name": "X-NAMECOM-SIGNATURE",
+            "in": "header",
+            "description": "HMAC signature for the request payload. See HMAC signing documentation for example code and detailed explanation of signing.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "djasfgafgflgsdfgdsfkhfhjas,12334782,1123-3423-4dss4-354"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -6978,10 +20963,10 @@ export const EMBEDDED_SPEC = {
           "200": {
             "description": "The subscribed server accepted the request."
           },
-          "4xx": {
+          "4XX": {
             "description": "The subscribed server returned an error (bad request, Unauthenticated etc)."
           },
-          "5xx": {
+          "5XX": {
             "description": "The subscribed server experienced an error while processing the request."
           }
         }
@@ -6993,8 +20978,20 @@ export const EMBEDDED_SPEC = {
           "Webhook Notifications"
         ],
         "operationId": "DomainTransferStatusChangeWebhook",
-        "summary": "Domain Transfer Status Change",
-        "description": "Sent when you have subscribed to the event on your account, and a domain transfer is processing.",
+        "summary": "Domain Transfer In Status Change",
+        "description": "Sent when you have subscribed to the event on your account, and a domain transfer IN to name.com is processing.\nThis webhook reports status changes for transfers where name.com is the gaining registrar (i.e., transfers into your name.com account).",
+        "parameters": [
+          {
+            "name": "X-NAMECOM-SIGNATURE",
+            "in": "header",
+            "description": "HMAC signature for the request payload. See HMAC signing documentation for example code and detailed explanation of signing.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "djasfgafgflgsdfgdsfkhfhjas,12334782,1123-3423-4dss4-354"
+            }
+          }
+        ],
         "requestBody": {
           "description": "The request sent to your server.",
           "required": true,
@@ -7010,10 +21007,308 @@ export const EMBEDDED_SPEC = {
           "200": {
             "description": "The subscribed server accepted the request."
           },
-          "4xx": {
+          "4XX": {
             "description": "The subscribed server returned an error (bad request, Unauthenticated etc)."
           },
-          "5xx": {
+          "5XX": {
+            "description": "The subscribed server experienced an error while processing the request."
+          }
+        }
+      }
+    },
+    "domainTransferOutStatusChange": {
+      "post": {
+        "tags": [
+          "Webhook Notifications"
+        ],
+        "operationId": "DomainTransferOutStatusChangeWebhook",
+        "summary": "Domain Transfer Out Status Change",
+        "description": "Sent when a domain transfer OUT from name.com has a status change: `initiated`, `completed`, or `canceled`.\n\n- **initiated** — pending outbound transfer started. Domain remains on the losing account.\n- **completed** — domain removed from name.com.\n- **canceled** — outbound transfer is no longer pending at the registry. Domain remains on the losing account.\n\nWhen status is `completed`, edge cases (including near-expiration) may briefly disagree with the registry.",
+        "parameters": [
+          {
+            "name": "X-NAMECOM-SIGNATURE",
+            "in": "header",
+            "description": "HMAC signature for the request payload. See HMAC signing documentation for example code and detailed explanation of signing.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "djasfgafgflgsdfgdsfkhfhjas,12334782,1123-3423-4dss4-354"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The request sent to your server when a domain transfer out status changes.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DomainTransferOutStatusChange"
+              },
+              "examples": {
+                "initiated": {
+                  "summary": "Transfer out initiated",
+                  "value": {
+                    "eventName": "domain.transfer_out.status_change",
+                    "domainName": "example.com",
+                    "status": "initiated",
+                    "registryClientId": "NAMECOM-123"
+                  }
+                },
+                "completed": {
+                  "summary": "Transfer out completed",
+                  "value": {
+                    "eventName": "domain.transfer_out.status_change",
+                    "domainName": "example.com",
+                    "status": "completed",
+                    "registryClientId": "NAMECOM-123"
+                  }
+                },
+                "canceled": {
+                  "summary": "Transfer out canceled (no longer pending at registry)",
+                  "value": {
+                    "eventName": "domain.transfer_out.status_change",
+                    "domainName": "example.com",
+                    "status": "canceled",
+                    "registryClientId": "NAMECOM-123"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The subscribed server accepted the request."
+          },
+          "4XX": {
+            "description": "The subscribed server returned an error (bad request, unauthenticated, etc)."
+          },
+          "5XX": {
+            "description": "The subscribed server experienced an error while processing the request."
+          }
+        }
+      }
+    },
+    "contactVerificationStatusChange": {
+      "post": {
+        "tags": [
+          "Webhook Notifications"
+        ],
+        "operationId": "ContactVerificationStatusChangeWebhook",
+        "summary": "Contact Verification Status Change",
+        "description": "This is the payload that will be sent to the subscribed URL, when a change to contact verification status occurs. This will trigger on both verified and unverified contact status change events.",
+        "parameters": [
+          {
+            "name": "X-NAMECOM-SIGNATURE",
+            "in": "header",
+            "description": "HMAC signature for the request payload. See HMAC signing documentation for example code and detailed explanation of signing.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "djasfgafgflgsdfgdsfkhfhjas,12334782,1123-3423-4dss4-354"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContactVerificationStatusChange"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The subscribed server accepted the request."
+          },
+          "4XX": {
+            "description": "The subscribed server returned an error (bad request, Unauthenticated etc)."
+          },
+          "5XX": {
+            "description": "The subscribed server experienced an error while processing the request."
+          }
+        }
+      }
+    },
+    "domainTransferInternalInStatusChange": {
+      "post": {
+        "tags": [
+          "Webhook Notifications"
+        ],
+        "operationId": "DomainTransferInternalInStatusChangeWebhook",
+        "summary": "Internal Transfer In Status Change",
+        "description": "Sent when you have subscribed to the event on your account, and a name.com domain transfers into your account.",
+        "parameters": [
+          {
+            "name": "X-NAMECOM-SIGNATURE",
+            "in": "header",
+            "description": "HMAC signature for the request payload. See HMAC signing documentation for example code and detailed explanation of signing.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "djasfgafgflgsdfgdsfkhfhjas,12334782,1123-3423-4dss4-354"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DomainTransferInternalInStatusChange"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The subscribed server accepted the request."
+          },
+          "4XX": {
+            "description": "The subscribed server returned an error (bad request, unauthenticated etc)."
+          },
+          "5XX": {
+            "description": "The subscribed server experienced an error while processing the request."
+          }
+        }
+      }
+    },
+    "domainTransferInternalOutStatusChange": {
+      "post": {
+        "tags": [
+          "Webhook Notifications"
+        ],
+        "operationId": "DomainTransferInternalOutStatusChangeWebhook",
+        "summary": "Internal Transfer Out Status Change",
+        "description": "Sent when you have subscribed to the event on your account, and a name.com domain transfers out of your account.",
+        "parameters": [
+          {
+            "name": "X-NAMECOM-SIGNATURE",
+            "in": "header",
+            "description": "HMAC signature for the request payload. See HMAC signing documentation for example code and detailed explanation of signing.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "djasfgafgflgsdfgdsfkhfhjas,12334782,1123-3423-4dss4-354"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DomainTransferInternalOutStatusChange"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The subscribed server accepted the request."
+          },
+          "4XX": {
+            "description": "The subscribed server returned an error (bad request, unauthenticated etc)."
+          },
+          "5XX": {
+            "description": "The subscribed server experienced an error while processing the request."
+          }
+        }
+      }
+    },
+    "domainRegistryRejection": {
+      "post": {
+        "tags": [
+          "Webhook Notifications"
+        ],
+        "operationId": "DomainRegistryRejectionWebhook",
+        "summary": "Domain Registry Rejection",
+        "description": "Sent when you have subscribed to this event on your account, and a domain **create** request fails after asynchronous registry processing. Most registrations complete successfully at create time; this webhook covers the uncommon case where processing completes later with a failure.",
+        "parameters": [
+          {
+            "name": "X-NAMECOM-SIGNATURE",
+            "in": "header",
+            "description": "HMAC signature for the request payload. See HMAC signing documentation for example code and detailed explanation of signing.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "djasfgafgflgsdfgdsfkhfhjas,12334782,1123-3423-4dss4-354"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DomainRegistryRejection"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The subscribed server accepted the request."
+          },
+          "4XX": {
+            "description": "The subscribed server returned an error (bad request, unauthenticated etc)."
+          },
+          "5XX": {
+            "description": "The subscribed server experienced an error while processing the request."
+          }
+        }
+      }
+    },
+    "domainExpiration": {
+      "post": {
+        "tags": [
+          "Webhook Notifications"
+        ],
+        "operationId": "DomainExpirationWebhook",
+        "summary": "Domain Expiration",
+        "description": "Sent when you have subscribed to this event on your account, and a domain has expired and entered the post-expiry grace period. This notification is informational only.",
+        "parameters": [
+          {
+            "name": "X-NAMECOM-SIGNATURE",
+            "in": "header",
+            "description": "HMAC signature for the request payload. See HMAC signing documentation for example code and detailed explanation of signing.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "djasfgafgflgsdfgdsfkhfhjas,12334782,1123-3423-4dss4-354"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The request sent to your server when a domain has expired and entered the post-expiry grace period.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DomainExpiration"
+              },
+              "examples": {
+                "example": {
+                  "value": {
+                    "eventName": "domain.expiration",
+                    "domainName": "example.com",
+                    "expirationDate": "2026-08-15T00:00:00Z"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The subscribed server accepted the request."
+          },
+          "4XX": {
+            "description": "The subscribed server returned an error (bad request, unauthenticated, etc)."
+          },
+          "5XX": {
             "description": "The subscribed server experienced an error while processing the request."
           }
         }
@@ -7025,7 +21320,7 @@ export const EMBEDDED_SPEC = {
       "BasicAuth": {
         "scheme": "basic",
         "type": "http",
-        "description": "Authentication for the name.com API (Core) uses HTTP Basic Authentication. Provide your username and API token (not your account password) as the credentials. For the testing environment (api.dev.name.com), append \"-test\" to your username and use your test API token found in your API Token Management page.\nNote that Two-Step Verification is not compatible with API access. Rate limits of 20 requests per second or 3000 requests per hour apply. All requests must be made over HTTPS (port 443).\nFailure to authenticate properly will result in 401 Unauthenticated or 403 Permission Denied responses with appropriate error messages."
+        "description": "Authenticate via HTTP Basic with your account username and API token. Examples use an explicit 'Authorization: Basic <base64(username:token)>' header; 'curl -u username:token' is equivalent. For sandbox, append \"-test\" to your username and use your sandbox token on api.dev.name.com."
       }
     },
     "schemas": {
@@ -7044,65 +21339,25 @@ export const EMBEDDED_SPEC = {
           "balance"
         ]
       },
-      "Unauthorized401": {
-        "type": "object",
-        "required": [
-          "message"
-        ],
-        "properties": {
-          "message": {
-            "type": "string",
-            "description": "A human-readable message providing more details about the error",
-            "example": "Unauthorized"
-          }
-        }
-      },
-      "TooManyRequests429": {
-        "type": "object",
-        "properties": {
-          "message": {
-            "type": "string",
-            "description": "A human-readable message providing more details about the error",
-            "example": "Rate Limit Exceeded"
-          }
-        }
-      },
-      "GenericError500": {
-        "type": "object",
-        "required": [
-          "message"
-        ],
-        "properties": {
-          "message": {
-            "type": "string",
-            "description": "A human-readable message providing more details about the error.",
-            "example": "Internal Server Error"
-          },
-          "details": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Additional context or information about the error.",
-            "example": "Something went wrong."
-          }
-        }
-      },
       "Contact": {
-        "description": "Contact contains all relevant contact data for a domain registrant.",
+        "description": "Contact contains all relevant contact data for a domain registrant. This schema is used for API responses and may contain null values for legacy data. For creating or updating contacts, use ContactRequest which enforces all validation requirements.",
         "type": "object",
         "properties": {
           "firstName": {
             "description": "First name of the contact.",
-            "type": "string",
-            "example": "John",
-            "minLength": 1
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "John"
           },
           "lastName": {
             "description": "Last name of the contact.",
-            "type": "string",
-            "example": "Doe",
-            "minLength": 1
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "Doe"
           },
           "companyName": {
             "description": "Company name of the contact. Leave blank if the contact is an individual, as some registries may assume it is a corporate entity otherwise.",
@@ -7114,9 +21369,11 @@ export const EMBEDDED_SPEC = {
           },
           "address1": {
             "description": "The first line of the contact's address.",
-            "type": "string",
-            "example": "123 Main Street",
-            "minLength": 1
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "123 Main Street"
           },
           "address2": {
             "description": "The second line of the contact's address (optional).",
@@ -7128,38 +21385,50 @@ export const EMBEDDED_SPEC = {
           },
           "city": {
             "description": "City of the contact's address.",
-            "type": "string",
-            "example": "New York",
-            "minLength": 1
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "New York"
           },
           "state": {
             "description": "State or Province of the contact's address.",
-            "type": "string",
-            "example": "NY",
-            "minLength": 1
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "NY"
           },
           "zip": {
             "description": "ZIP or Postal Code of the contact's address.",
-            "type": "string",
-            "example": "10001",
-            "minLength": 1
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "10001"
           },
           "country": {
             "description": "Country code for the contact's address. Must be an ISO 3166-1 alpha-2 country code.",
-            "type": "string",
-            "example": "US",
-            "pattern": "^[A-Z]{2}$"
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "US"
           },
           "email": {
             "description": "Email address of the contact. Must be a valid email format. The validation is performed against the `addr-spec` syntax in [RFC 822](https://datatracker.ietf.org/doc/html/rfc822)",
-            "type": "string",
-            "format": "email",
+            "type": [
+              "string",
+              "null"
+            ],
             "example": "john.doe@example.com"
           },
           "phone": {
             "description": "Phone number of the contact. Should follow the E.164 international format: \"+[country code][number]\".",
-            "type": "string",
-            "pattern": "^\\+[1-9]\\d{7,14}$",
+            "type": [
+              "string",
+              "null"
+            ],
             "example": "+15551234567"
           },
           "fax": {
@@ -7168,37 +21437,45 @@ export const EMBEDDED_SPEC = {
               "string",
               "null"
             ],
-            "pattern": "^\\+[1-9]\\d{7,14}$",
             "example": "+15557654321"
+          },
+          "isVerified": {
+            "description": "Indicates if the contact has been verified as per ICANN requirements. If the value is `false` it indicates that the contact has not completed the required verification process. This property is read-only and will be included in responses but should not be included in requests.",
+            "type": "boolean",
+            "example": true,
+            "readOnly": true
+          },
+          "verificationId": {
+            "description": "When the contact is unverified, this is the ID of the pending verification record. Use this ID with the resend verification email and verify contact endpoints. Omitted or null when the contact is verified.",
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "example": 12345,
+            "readOnly": true
           }
-        },
-        "required": [
-          "firstName",
-          "lastName",
-          "address1",
-          "city",
-          "state",
-          "zip",
-          "country",
-          "email",
-          "phone"
-        ]
+        }
       },
       "RegistrantContact": {
-        "description": "Contact contains all relevant contact data for a domain registrant.",
+        "description": "Contact contains all relevant contact data for a domain registrant. This schema is used for API responses and may contain null values for legacy data. For creating or updating contacts, use RegistrantContactRequest which enforces all validation requirements.",
         "type": "object",
         "properties": {
           "firstName": {
             "description": "First name of the contact.",
-            "type": "string",
-            "example": "John",
-            "minLength": 1
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "John"
           },
           "lastName": {
             "description": "Last name of the contact.",
-            "type": "string",
-            "example": "Doe",
-            "minLength": 1
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "Doe"
           },
           "companyName": {
             "description": "Company name of the contact. Leave blank if the contact is an individual. Please be advised that ICANN policy links the \"Company Name\" field (Organization) in your domain's contact details to its legal ownership. If this field contains information, the listed organization is considered the legal \"Registered Name Holder\" (domain owner).",
@@ -7210,9 +21487,11 @@ export const EMBEDDED_SPEC = {
           },
           "address1": {
             "description": "The first line of the contact's address.",
-            "type": "string",
-            "example": "123 Main Street",
-            "minLength": 1
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "123 Main Street"
           },
           "address2": {
             "description": "The second line of the contact's address (optional).",
@@ -7224,38 +21503,50 @@ export const EMBEDDED_SPEC = {
           },
           "city": {
             "description": "City of the contact's address.",
-            "type": "string",
-            "example": "New York",
-            "minLength": 1
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "New York"
           },
           "state": {
             "description": "State or Province of the contact's address.",
-            "type": "string",
-            "example": "NY",
-            "minLength": 1
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "NY"
           },
           "zip": {
             "description": "ZIP or Postal Code of the contact's address.",
-            "type": "string",
-            "example": "10001",
-            "minLength": 1
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "10001"
           },
           "country": {
             "description": "Country code for the contact's address. Must be an ISO 3166-1 alpha-2 country code.",
-            "type": "string",
-            "example": "US",
-            "pattern": "^[A-Z]{2}$"
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "US"
           },
           "email": {
             "description": "Email address of the contact. Must be a valid email format. The validation is performed against the `addr-spec` syntax in [RFC 822](https://datatracker.ietf.org/doc/html/rfc822)",
-            "type": "string",
-            "format": "email",
+            "type": [
+              "string",
+              "null"
+            ],
             "example": "john.doe@example.com"
           },
           "phone": {
             "description": "Phone number of the contact. Should follow the E.164 international format: \"+[country code][number]\".",
-            "type": "string",
-            "pattern": "^\\+[1-9]\\d{7,14}$",
+            "type": [
+              "string",
+              "null"
+            ],
             "example": "+15551234567"
           },
           "fax": {
@@ -7264,21 +21555,25 @@ export const EMBEDDED_SPEC = {
               "string",
               "null"
             ],
-            "pattern": "^\\+[1-9]\\d{7,14}$",
             "example": "+15557654321"
+          },
+          "isVerified": {
+            "description": "Indicates if the contact has been verified as per ICANN requirements. If the value is `false` it indicates that the contact has not completed the required verification process. This property is read-only and will be included in responses but should not be included in requests.",
+            "type": "boolean",
+            "example": true,
+            "readOnly": true
+          },
+          "verificationId": {
+            "description": "When the contact is unverified, this is the ID of the pending verification record. Use this ID with the resend verification email and verify contact endpoints. Omitted or null when the contact is verified.",
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "example": 12345,
+            "readOnly": true
           }
-        },
-        "required": [
-          "firstName",
-          "lastName",
-          "address1",
-          "city",
-          "state",
-          "zip",
-          "country",
-          "email",
-          "phone"
-        ]
+        }
       },
       "Contacts": {
         "description": "Contacts stores the contact information for the roles related to domains.",
@@ -7339,6 +21634,215 @@ export const EMBEDDED_SPEC = {
           }
         }
       },
+      "ContactRequest": {
+        "description": "Contact contains all relevant contact data for a domain registrant.  This schema is used for creating and updating contacts (POST/PUT requests) and includes all validation requirements. All fields listed in the `required` array must be provided and cannot be null or empty.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Contact"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "firstName": {
+                "description": "First name of the contact.",
+                "type": "string",
+                "example": "John",
+                "minLength": 1
+              },
+              "lastName": {
+                "description": "Last name of the contact.",
+                "type": "string",
+                "example": "Doe",
+                "minLength": 1
+              },
+              "address1": {
+                "description": "The first line of the contact's address.",
+                "type": "string",
+                "example": "123 Main Street",
+                "minLength": 1
+              },
+              "city": {
+                "description": "City of the contact's address.",
+                "type": "string",
+                "example": "New York",
+                "minLength": 1
+              },
+              "state": {
+                "description": "State or Province of the contact's address.",
+                "type": "string",
+                "example": "NY",
+                "minLength": 1
+              },
+              "zip": {
+                "description": "ZIP or Postal Code of the contact's address. This field is required and must be a non-empty string.",
+                "type": "string",
+                "example": "10001",
+                "minLength": 1
+              },
+              "country": {
+                "description": "Country code for the contact's address. Must be an ISO 3166-1 alpha-2 country code.",
+                "type": "string",
+                "example": "US",
+                "pattern": "^[A-Z]{2}$"
+              },
+              "email": {
+                "description": "Email address of the contact. Must be a valid email format. The validation is performed against the `addr-spec` syntax in [RFC 822](https://datatracker.ietf.org/doc/html/rfc822)",
+                "type": "string",
+                "format": "email",
+                "example": "john.doe@example.com"
+              },
+              "phone": {
+                "description": "Phone number of the contact. Should follow the E.164 international format: \"+[country code][number]\".",
+                "type": "string",
+                "pattern": "^\\+[1-9]\\d{7,14}$",
+                "example": "+15551234567"
+              },
+              "fax": {
+                "description": "Fax number of the contact. Should follow the E.164 international format: \"+[country code][number]\".",
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^\\+[1-9]\\d{7,14}$",
+                "example": "+15557654321"
+              }
+            },
+            "required": [
+              "firstName",
+              "lastName",
+              "address1",
+              "city",
+              "state",
+              "zip",
+              "country",
+              "email",
+              "phone"
+            ]
+          }
+        ]
+      },
+      "RegistrantContactRequest": {
+        "description": "Contact contains all relevant contact data for a domain registrant.  This schema is used for creating and updating contacts (POST/PUT requests) and includes all validation requirements. All fields listed in the `required` array must be provided and cannot be null or empty.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/RegistrantContact"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "firstName": {
+                "description": "First name of the contact.",
+                "type": "string",
+                "example": "John",
+                "minLength": 1
+              },
+              "lastName": {
+                "description": "Last name of the contact.",
+                "type": "string",
+                "example": "Doe",
+                "minLength": 1
+              },
+              "address1": {
+                "description": "The first line of the contact's address.",
+                "type": "string",
+                "example": "123 Main Street",
+                "minLength": 1
+              },
+              "city": {
+                "description": "City of the contact's address.",
+                "type": "string",
+                "example": "New York",
+                "minLength": 1
+              },
+              "state": {
+                "description": "State or Province of the contact's address.",
+                "type": "string",
+                "example": "NY",
+                "minLength": 1
+              },
+              "zip": {
+                "description": "ZIP or Postal Code of the contact's address. This field is required and must be a non-empty string.",
+                "type": "string",
+                "example": "10001",
+                "minLength": 1
+              },
+              "country": {
+                "description": "Country code for the contact's address. Must be an ISO 3166-1 alpha-2 country code.",
+                "type": "string",
+                "example": "US",
+                "pattern": "^[A-Z]{2}$"
+              },
+              "email": {
+                "description": "Email address of the contact. Must be a valid email format. The validation is performed against the `addr-spec` syntax in [RFC 822](https://datatracker.ietf.org/doc/html/rfc822)",
+                "type": "string",
+                "format": "email",
+                "example": "john.doe@example.com"
+              },
+              "phone": {
+                "description": "Phone number of the contact. Should follow the E.164 international format: \"+[country code][number]\".",
+                "type": "string",
+                "pattern": "^\\+[1-9]\\d{7,14}$",
+                "example": "+15551234567"
+              },
+              "fax": {
+                "description": "Fax number of the contact. Should follow the E.164 international format: \"+[country code][number]\".",
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^\\+[1-9]\\d{7,14}$",
+                "example": "+15557654321"
+              }
+            },
+            "required": [
+              "firstName",
+              "lastName",
+              "address1",
+              "city",
+              "state",
+              "zip",
+              "country",
+              "email",
+              "phone"
+            ]
+          }
+        ]
+      },
+      "ContactsRequest": {
+        "description": "Contacts stores the contact information for the roles related to domains. This schema is used for requests.",
+        "properties": {
+          "admin": {
+            "$ref": "#/components/schemas/ContactRequest"
+          },
+          "billing": {
+            "$ref": "#/components/schemas/ContactRequest"
+          },
+          "registrant": {
+            "$ref": "#/components/schemas/RegistrantContactRequest"
+          },
+          "tech": {
+            "$ref": "#/components/schemas/ContactRequest"
+          }
+        },
+        "type": "object"
+      },
+      "AccountRequest": {
+        "description": "Account lists all the data for an account. This schema is used for requests.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Account"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "contacts": {
+                "$ref": "#/components/schemas/ContactsRequest",
+                "description": "Contact information associated with this account."
+              }
+            }
+          }
+        ]
+      },
       "CreateAccountRequest": {
         "description": "CreateAccountRequest has the information that is needed to create an account with the CreateAccount function.",
         "type": "object",
@@ -7349,7 +21853,7 @@ export const EMBEDDED_SPEC = {
         ],
         "properties": {
           "account": {
-            "$ref": "#/components/schemas/Account",
+            "$ref": "#/components/schemas/AccountRequest",
             "description": "The account details for the new account being created."
           },
           "apiTos": {
@@ -7441,27 +21945,6 @@ export const EMBEDDED_SPEC = {
           }
         }
       },
-      "GenericForbidden403": {
-        "type": "object",
-        "required": [
-          "message"
-        ],
-        "properties": {
-          "message": {
-            "type": "string",
-            "description": "A human-readable message providing more details about the error",
-            "example": "Permission denied"
-          },
-          "details": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Additional context or information about the error",
-            "example": "Failed authentication"
-          }
-        }
-      },
       "UnsupportedMedia415": {
         "type": "object",
         "required": [
@@ -7474,6 +21957,13 @@ export const EMBEDDED_SPEC = {
             "example": "The 'Content-Type' header must be 'application/json' for this request."
           }
         }
+      },
+      "PerPageLimit": {
+        "description": "Maximum number of records to return per page for paginated list endpoints.",
+        "type": "integer",
+        "format": "int32",
+        "minimum": 1,
+        "maximum": 1000
       },
       "Domain": {
         "description": "Domain contains all relevant data for a domain.",
@@ -7504,9 +21994,28 @@ export const EMBEDDED_SPEC = {
             "example": true
           },
           "locked": {
-            "description": "Indicates if the domain is locked, preventing transfers to another registrar.",
+            "description": "Indicates if the domain is **transfer locked**, preventing transfers to another registrar.",
             "type": "boolean",
             "example": true
+          },
+          "locks": {
+            "description": "List of all registry locking statuses currently applied to the domain. Use this to see which locks are active (e.g. clientTransferProhibited, clientHold). Empty when the domain has no locks applied.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "readOnly": true,
+            "example": [
+              "clientTransferProhibited",
+              "clientHold"
+            ]
+          },
+          "transferLockExpiresAt": {
+            "description": "When present, the domain has an active ICANN-mandated transfer lock (new registration, transfer-in, or material registrant contact change) that blocks client unlock via the API until this time. When omitted, there is no active policy transfer lock with a known expiry — the domain may still be locked (`locked: true`) due to a voluntary user lock. Does not represent RegistrarLock, AccountLock, verification holds, trademark-claim locks, or admin TransferLock with no expiry date.",
+            "type": "string",
+            "format": "date-time",
+            "example": "2023-03-16T14:30:00Z",
+            "readOnly": true
           },
           "privacyEnabled": {
             "description": "Indicates if Whois Privacy is enabled for this domain.",
@@ -7561,9 +22070,16 @@ export const EMBEDDED_SPEC = {
         "example": true
       },
       "locked": {
-        "description": "Indicates if the domain is locked, preventing transfers to another registrar.",
+        "description": "Indicates if the domain is **transfer locked**, preventing transfers to another registrar.",
         "type": "boolean",
         "example": true
+      },
+      "transferLockExpiresAt": {
+        "description": "When present, the domain has an active ICANN-mandated transfer lock (new registration, transfer-in, or material registrant contact change) that blocks client unlock via the API until this time. When omitted, there is no active policy transfer lock with a known expiry — the domain may still be locked (`locked: true`) due to a voluntary user lock. Does not represent RegistrarLock, AccountLock, verification holds, trademark-claim locks, or admin TransferLock with no expiry date.",
+        "type": "string",
+        "format": "date-time",
+        "example": "2023-03-16T14:30:00Z",
+        "readOnly": true
       },
       "privacyEnabled": {
         "description": "Indicates if Whois Privacy is enabled for this domain.",
@@ -7612,6 +22128,9 @@ export const EMBEDDED_SPEC = {
               "locked": {
                 "$ref": "#/components/schemas/locked"
               },
+              "transferLockExpiresAt": {
+                "$ref": "#/components/schemas/transferLockExpiresAt"
+              },
               "privacyEnabled": {
                 "$ref": "#/components/schemas/privacyEnabled"
               },
@@ -7633,8 +22152,7 @@ export const EMBEDDED_SPEC = {
               "locked",
               "privacyEnabled",
               "contacts",
-              "nameservers",
-              "renewalPrice"
+              "nameservers"
             ]
           }
         ]
@@ -7697,38 +22215,76 @@ export const EMBEDDED_SPEC = {
             "properties": {
               "domainName": {
                 "type": "string"
+              },
+              "privacyEnabled": {
+                "type": "boolean",
+                "description": "Whether to include Whois Privacy with the registration. Whois Privacy is free. If omitted, the account default from account settings is used. Privacy is only added when the TLD supports it."
+              },
+              "contacts": {
+                "$ref": "#/components/schemas/ContactsRequest"
               }
             }
           }
         ]
       },
+      "DomainClaimsInfo": {
+        "description": "Claims acknowledgement data is required if trademark claims exist for requested domain. This data is obtained from a [Domain Claims Check](/api/v1/reference/domain-info/check-domain-claims) response and includes the claim identifier and validity dates.",
+        "type": "object",
+        "properties": {
+          "claimId": {
+            "type": "string",
+            "description": "The claim identifier from TMCH (Trademark Clearinghouse)",
+            "example": "8c3027d30000000000382500785"
+          },
+          "notBefore": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The date before which the claim acknowledgment is not valid",
+            "example": "2024-01-15T10:30:00Z"
+          },
+          "notAfter": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The date after which the claim acknowledgment expires",
+            "example": "2024-01-15T10:30:00Z"
+          }
+        }
+      },
       "CreateDomainRequest": {
-        "description": "CreateDomainRequest has the information that is needed to create a domain with the CreateDomain function.",
+        "description": "CreateDomainRequest has the information that is needed to create a domain with the CreateDomain function.\nSee the [Domain pricing guide](/guides/domain-pricing) for which endpoints supply create pricing (Search/Check Availability vs Get Pricing) for each `purchaseType`.",
         "properties": {
           "domain": {
             "$ref": "#/components/schemas/DomainCreatePayload"
           },
           "purchasePrice": {
-            "description": "PurchasePrice is the price in USD for purchasing this domain for the minimum time period (typically 1 year). PurchasePrice is required if purchaseType is not \"registration\" or if it is a premium domain. If privacyEnabled is set, the regular price for Whois Privacy protection will be added automatically. If VAT tax applies, it will also be added automatically.",
+            "description": "PurchasePrice is the price in USD for purchasing this domain for the minimum time period (typically 1 year). PurchasePrice is required if purchaseType is not \"registration\" or if it is a premium domain. Whois Privacy is free and does not affect purchasePrice. If privacyEnabled is omitted, the account default from account settings is used. If VAT tax applies, it will also be added automatically.",
             "format": "double",
             "type": "number"
           },
           "purchaseType": {
-            "description": "PurchaseType defaults to \"registration\" but should be copied from the result of either a [Search](#operation/Search) or [checkAvailability](#operation/CheckAvailability) request.",
+            "description": "PurchaseType indicates what kind of purchase this domain create is for. Defaults to `registration` if omitted. **Recommended:** Use `registration` unless you support acquisition types (aftermarket, expiring, backorder) — see the [Domain purchase pricing guide](/guides/domain-pricing). This value should be copied from the [Search](/api/v1/reference/domains/search) or [Check Availability](/api/v1/reference/domains/check-availability) result. The value `registration` covers both standard and **registry premium** domains — use the `premium` flag from the discovery result to tell them apart. Aftermarket, expiring, and backorder types use flat acquisition fees from Search or Check Availability; see the [Domain pricing guide](/guides/domain-pricing).",
             "type": "string"
           },
           "tldRequirements": {
             "additionalProperties": {
               "type": "string"
             },
-            "description": "TLDRequirements is a way to pass additional data that is required by some registries. You can check before registration by using the [Domain Info](#operation/GetRequirement) API.\nAs these requirements vary wildly between registries and TLDs, we are not attempting to document them here.\n#### IDN Domains\nThis parameter is required for registering domains that contain non-ASCII characters.  The value should be the specific code for the character set, such as `ES` for Spanish, or `CYRL` for Cyrillic. These abbreviations can vary between TLDs, and it is highly recommended that you use [Domain Info](#operation/GetRequirement) API to ensure that the TLD allows for the specific IDN table, as well as the correct abbreviation.",
+            "description": "TLDRequirements is a way to pass additional data that is required by some registries. You can check before registration by using the [Domain Info](/api/v1/reference/domain-info/get-specific-tld-requirements) API.\nAs these requirements vary wildly between registries and TLDs, we are not attempting to document them here.\n#### IDN Domains\nThis parameter is required for registering domains that contain non-ASCII characters.  The value should be the specific code for the character set, such as `ES` for Spanish, or `CYRL` for Cyrillic. These abbreviations can vary between TLDs, and it is highly recommended that you use [Domain Info](/api/v1/reference/domain-info/get-specific-tld-requirements) API to ensure that the TLD allows for the specific IDN table, as well as the correct abbreviation.",
             "type": "object"
           },
+          "claims": {
+            "$ref": "#/components/schemas/DomainClaimsInfo"
+          },
           "years": {
-            "description": "Years specifies how many years to register the domain for. Years defaults to the minimum time period (typically 1 year) if not passed and cannot be more than 10. Some TLDs default to longer initial periods (e.g. .AI requires a 2 year registration).\nIf passing purchasePrice make sure to adjust it accordingly.",
+            "description": "Years specifies the registration term in years. **Only affects price and registration length for `purchaseType: registration`.** Defaults to each TLD's minimum if omitted (usually 1; 2 for `.ai`). Must be a supported registration term for the TLD when `purchaseType` is `registration` (commonly 1–10 years). For `purchaseType: registration` when `purchasePrice` is required, call [Get Pricing](/api/v1/reference/domains/get-pricing-for-domain) with the same `years` value. For aftermarket, expiring, and backorder types: pass the TLD default — it does **not** multiply `purchasePrice` and does **not** guarantee a multi-year registration. Check `domain.expireDate` in the create response for actual expiry. To add registration time after acquisition, use [Renew Domain](/api/v1/reference/domains/renew-domain).",
             "format": "int32",
             "type": "integer",
             "example": 1
+          },
+          "promoCode": {
+            "description": "PromoCode is an optional promotional code to apply to the domain purchase. Only one promo code can be applied per request.",
+            "type": "string",
+            "minLength": 1
           }
         },
         "type": "object",
@@ -7748,7 +22304,7 @@ export const EMBEDDED_SPEC = {
             "type": "integer"
           },
           "totalPaid": {
-            "description": "TotalPaid is the total amount paid, including VAT and Whois privacy protection.",
+            "description": "TotalPaid is the total amount paid, including VAT when applicable. Whois Privacy is free and is not included in this amount.",
             "format": "double",
             "type": "number"
           }
@@ -7817,6 +22373,24 @@ export const EMBEDDED_SPEC = {
             "type": "string",
             "description": "Additional context or information about the pricing error",
             "example": "The pricing information required to process this request is temporarily unavailable. This is an internal system error. Please try again in a few minutes or contact support if the issue persists."
+          }
+        }
+      },
+      "UnavailableForLegal451": {
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "A human-readable message explaining why the resource is unavailable for legal reasons",
+            "example": "Unavailable for Legal Reasons"
+          },
+          "details": {
+            "type": "string",
+            "description": "Additional context or information about the legal restriction",
+            "example": "This domain registration is restricted due to legal requirements in your jurisdiction."
           }
         }
       },
@@ -7918,7 +22492,14 @@ export const EMBEDDED_SPEC = {
         ]
       },
       "CreateDNSSECBody": {
-        "description": "DNSSEC contains all the data required to create a DS record at the registry.",
+        "description": "Request body for creating a DNSSEC DS record.",
+        "type": "object",
+        "required": [
+          "algorithm",
+          "digest",
+          "digestType",
+          "keyTag"
+        ],
         "properties": {
           "algorithm": {
             "format": "int32",
@@ -7927,11 +22508,8 @@ export const EMBEDDED_SPEC = {
           },
           "digest": {
             "description": "Digest is a digest of the DNSKEY RR that is registered with the registry.",
-            "type": "string"
-          },
-          "domainName": {
-            "description": "The name of the domain.",
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "digestType": {
             "format": "int32",
@@ -7943,8 +22521,7 @@ export const EMBEDDED_SPEC = {
             "title": "KeyTag contains the key tag value of the DNSKEY RR that validates this signature. The algorithm to generate it is here: https://tools.ietf.org/html/rfc4034#appendix-B",
             "type": "integer"
           }
-        },
-        "type": "object"
+        }
       },
       "EmailForwarding": {
         "description": "EmailForwarding contains all the information for an email forwarding entry.",
@@ -8005,7 +22582,7 @@ export const EMBEDDED_SPEC = {
         "description": "EmailForwarding contains all the information for an email forwarding entry.",
         "properties": {
           "emailBox": {
-            "description": "EmailBox is the user portion of the email address to forward. If your email is \"admin@example.com\", it would just be \"admin\"",
+            "description": "EmailBox is the user portion of the email address to forward. If your email is \"admin@example.com\", it would just be \"admin\". Wildcard and catch-all values (such as \"*\") are not supported.",
             "type": "string",
             "example": "admin",
             "minLength": 1
@@ -8029,10 +22606,14 @@ export const EMBEDDED_SPEC = {
         "properties": {
           "emailTo": {
             "description": "EmailTo is the entire email address to forward email to.",
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           }
         },
-        "type": "object"
+        "type": "object",
+        "required": [
+          "emailTo"
+        ]
       },
       "Record": {
         "description": "Record is an individual DNS resource record.",
@@ -8295,12 +22876,17 @@ export const EMBEDDED_SPEC = {
           {
             "type": "object",
             "properties": {
+              "id": {
+                "description": "Server-assigned unique identifier for the URL forwarding record. Use this ID with the URL Forwarding by-ID endpoints to get, update, or delete records.",
+                "type": "integer",
+                "format": "int32",
+                "example": 12345
+              },
               "host": {
-                "title": "The full hostname",
-                "description": "The complete hostname that is being forwarded (subdomain + domain).",
+                "title": "The subdomain portion of the hostname",
+                "description": "The subdomain portion of the hostname that is being forwarded.",
                 "type": "string",
-                "format": "hostname",
-                "example": "www.example.org"
+                "example": "www"
               }
             }
           }
@@ -8344,33 +22930,99 @@ export const EMBEDDED_SPEC = {
           "urlForwarding"
         ]
       },
-      "CreateURLForwardingBody": {
-        "description": "The request body for creating a new URL forwarding entry.",
+      "URLForwardingInput": {
+        "description": "Fields for creating a URL forwarding entry. ",
         "type": "object",
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/URLForwarding"
-          }
-        ]
-      },
-      "UpdateURLForwardingBody": {
-        "description": "The request body for updating an existing URL forwarding entry.",
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/URLForwarding"
+        "required": [
+          "host",
+          "forwardsTo",
+          "type"
+        ],
+        "properties": {
+          "forwardsTo": {
+            "description": "The destination URL to which this hostname will be forwarded.",
+            "type": "string",
+            "format": "uri",
+            "example": "https://destination-site.com"
           },
-          {
-            "type": "object",
-            "properties": {
-              "host": {
-                "readOnly": true
-              },
-              "domainName": {
-                "readOnly": true
-              }
-            }
+          "host": {
+            "title": "The subdomain portion of the hostname",
+            "description": "The subdomain portion of the hostname that is being forwarded. Use an empty string for the apex.",
+            "type": "string",
+            "example": "www"
+          },
+          "meta": {
+            "description": "Meta tags to include in the HTML page when using \"masked\" forwarding.\nIgnored for other forwarding types.\nExample: `<meta name='keywords' content='fish, denver, platte'>`\n",
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "<meta name='keywords' content='website, forwarding, masked'>"
+          },
+          "title": {
+            "description": "The title to be used for the HTML page when using \"masked\" forwarding.\nIgnored for other forwarding types.\n",
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "Welcome to my forwarded website"
+          },
+          "type": {
+            "description": "The type of URL forwarding. Valid values:\n  - `masked`: Retains the original domain in the address bar, preventing the user from seeing the actual destination URL. Sometimes called iframe forwarding.\n  - `redirect`: Uses a standard HTTP redirect (301), which changes the address bar to the destination URL.\n  - `302`: Uses a temporary HTTP redirect (302), which changes the address bar to the destination URL but indicates the resource is temporarily located elsewhere.\n",
+            "type": "string",
+            "enum": [
+              "masked",
+              "redirect",
+              "302"
+            ],
+            "example": "redirect"
           }
-        ]
+        }
+      },
+      "URLForwardingUpdate": {
+        "description": "Fields for updating a URL forwarding entry. Omit a property to leave it unchanged. An empty `host` string is the apex, not \"unchanged\". At least one property must be present; an empty body is rejected.",
+        "type": "object",
+        "minProperties": 1,
+        "properties": {
+          "forwardsTo": {
+            "description": "The destination URL to which this hostname will be forwarded.",
+            "type": "string",
+            "format": "uri",
+            "example": "https://destination-site.com"
+          },
+          "host": {
+            "title": "The subdomain portion of the hostname",
+            "description": "The subdomain portion of the hostname that is being forwarded. Omit this field to keep the existing host. Send an empty string to move the forwarding to the apex.",
+            "type": "string",
+            "example": "www"
+          },
+          "meta": {
+            "description": "Meta tags to include in the HTML page when using \"masked\" forwarding.\nIgnored for other forwarding types.\nExample: `<meta name='keywords' content='fish, denver, platte'>`\n",
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "<meta name='keywords' content='website, forwarding, masked'>"
+          },
+          "title": {
+            "description": "The title to be used for the HTML page when using \"masked\" forwarding.\nIgnored for other forwarding types.\n",
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "Welcome to my forwarded website"
+          },
+          "type": {
+            "description": "The type of URL forwarding. Valid values:\n  - `masked`: Retains the original domain in the address bar, preventing the user from seeing the actual destination URL. Sometimes called iframe forwarding.\n  - `redirect`: Uses a standard HTTP redirect (301), which changes the address bar to the destination URL.\n  - `302`: Uses a temporary HTTP redirect (302), which changes the address bar to the destination URL but indicates the resource is temporarily located elsewhere.\n",
+            "type": "string",
+            "enum": [
+              "masked",
+              "redirect",
+              "302"
+            ],
+            "example": "redirect"
+          }
+        }
       },
       "VanityNameserver": {
         "description": "VanityNameserver represents a custom nameserver associated with a domain, including its hostname and a list of IP addresses for glue records.",
@@ -8505,14 +23157,23 @@ export const EMBEDDED_SPEC = {
             "example": [
               "192.168.1.10",
               "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
-            ],
-            "minItems": 0
+            ]
           }
         },
-        "type": "object"
+        "type": "object",
+        "required": [
+          "ips"
+        ]
+      },
+      "EmptyObject": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Empty JSON object. This operation does not accept a payload; clients must still send `Content-Type: application/json` with body `{}`.",
+        "example": {}
       },
       "AuthCodeResponse": {
-        "description": "AuthCodeResponse returns the auth code from the GetAuthCodeForDomain funtion.",
+        "description": "This endpoint retrieves the transfer authorization code (EPP code) for qualifying domains. Locks may exist on a domain that can prevent the initiation of a transfer request, despite an auth code being returned by the API.  Use the [Get Domain](/api/v1/reference/domains/get-domain) API to check the lock status of a domain. A Create Transfer request for a locked domain will return an error.",
         "properties": {
           "authCode": {
             "description": "AuthCode is the authorization code needed to transfer a domain to another registrar. If you are storing auth codes, be sure to store them in a secure manner.",
@@ -8524,15 +23185,36 @@ export const EMBEDDED_SPEC = {
           "authCode"
         ]
       },
+      "GenericError500": {
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "A human-readable message providing more details about the error.",
+            "example": "Internal Server Error"
+          },
+          "details": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Additional context or information about the error.",
+            "example": "Something went wrong."
+          }
+        }
+      },
       "PricingResponse": {
-        "description": "PricingResponse returns the Pricing related information from the GetPricingForDomain function.",
+        "description": "PricingResponse returns the Pricing related information from the GetPricingForDomain endpoint.\nCovers standard and registry-premium **registration** pricing, plus renewal and transfer. Not a discovery endpoint — does not return `purchaseType`. Does not return aftermarket, expiring, or backorder acquisition prices. See the [Domain pricing guide](/guides/domain-pricing).",
         "properties": {
           "premium": {
-            "description": "Premium indicates that this pricing is a premium result and the respective prices must be passed in create, renew or transfer commands.",
+            "description": "Premium indicates whether this registration pricing result is for a registry premium or other non-standard registration. Reflects registration pricing only — may differ from discovery `premium` for aftermarket, expiring, or backorder results. When `true`, `purchasePrice` must be passed on [Create Domain](/api/v1/reference/domains/create-domain), [Renew Domain](/api/v1/reference/domains/renew-domain), or [Create Transfer](/api/v1/reference/transfers/create-transfer), requests.",
             "type": "boolean"
           },
           "purchasePrice": {
-            "description": "PurchasePrice is the price you will pay to register a domain. Can be passed in the CreateDomain request. If purchasePrice returns as null, it means that name.com is not currently accepting registrations for this combination of TLD and duration. If this is unexpected, please contact support.",
+            "description": "PurchasePrice is the total standard or registry-premium registration cost for the requested `years` query parameter — not a one-year component. Does not include aftermarket, expiring, or backorder acquisition prices. If `null`, name.com is not currently accepting registrations for this domain/term combination. For registry premium create (`purchaseType: registration`), pass this value with the same `years`. For aftermarket, expiring, or backorder types, use `purchasePrice` from Search/Check Availability instead.",
             "format": "double",
             "type": [
               "number",
@@ -8541,7 +23223,7 @@ export const EMBEDDED_SPEC = {
             "example": 24.99
           },
           "renewalPrice": {
-            "description": "RenewalPrice is the price you will pay to renew a domain. Can be passed in the RenewDomain request. If renewalPrice returns as null, it means that name.com is not currently accepting renewals for this combination of TLD and duration. If this is unexpected, please contact support.",
+            "description": "RenewalPrice is the total renewal cost for the requested `years`. If `null`, name.com is not currently accepting renewals for this domain/term combination. Pass as `purchasePrice` on [Renew Domain](/api/v1/reference/domains/renew-domain) for premium renewals. Do not use for computing Create Domain `purchasePrice` or multi-year create totals.",
             "format": "double",
             "type": [
               "number",
@@ -8550,7 +23232,7 @@ export const EMBEDDED_SPEC = {
             "example": 24.99
           },
           "transferPrice": {
-            "description": "TransferPrice is the price you will pay to transfer a domain. Can be passed in the CreateTransfer request. The TransferPrice is always for 1 year regardless of the years input. If transferPrice returns as null, it means that name.com is not currently accepting transfers for this combination of TLD and duration. If this is unexpected, please contact support.",
+            "description": "TransferPrice is the inbound transfer cost for this domain. The `years` query parameter does not affect this value. Pricing uses the TLD's minimum transfer/registration term (typically 1 year; for TLDs with a higher minimum, e.g. `.ai`, the total will reflect that minimum). If `null`, transfers are not accepted for this domain/term combination. Pass to [Create Transfer](/api/v1/reference/transfers/create-transfer) as `purchasePrice` when transfer price validation applies (required for premium transfers).",
             "format": "double",
             "type": [
               "number",
@@ -8568,15 +23250,15 @@ export const EMBEDDED_SPEC = {
         ]
       },
       "DomainsPurchasePrivacyBody": {
-        "description": "PrivacyRequest passes the domain name as well as the purchase parameters to the PurchasePrivacy function.",
+        "description": "Request body for enabling or extending WHOIS privacy on a domain.",
         "properties": {
           "purchasePrice": {
-            "description": "PurchasePrice is the (prorated) amount you expect to pay.",
+            "description": "WHOIS privacy is free for API users. This field does not add a privacy fee.",
             "format": "double",
             "type": "number"
           },
           "years": {
-            "description": "Years is the number of years you wish to purchase Whois Privacy for. Years defaults to 1 and cannot be more then the domain expiration date.",
+            "description": "Years is the number of years to enable or extend Whois Privacy for. Years defaults to 1 and cannot be more then the domain expiration date.",
             "format": "int32",
             "type": "integer",
             "default": 1
@@ -8585,7 +23267,7 @@ export const EMBEDDED_SPEC = {
         "type": "object"
       },
       "PrivacyResponse": {
-        "description": "PrivacyResponse contains the updated domain info as well as the order info for the newly purchased Whois Privacy.",
+        "description": "PrivacyResponse contains the updated domain info as well as the order info for the Whois Privacy that was enabled or extended.",
         "properties": {
           "domain": {
             "$ref": "#/components/schemas/DomainResponsePayload"
@@ -8596,10 +23278,10 @@ export const EMBEDDED_SPEC = {
             "type": "integer"
           },
           "totalPaid": {
-            "description": "TotalPaid is the total amount paid, including VAT.",
+            "description": "TotalPaid is the total amount paid, including VAT when applicable. Whois Privacy is free and is not included in this amount.",
             "format": "double",
             "type": "number",
-            "example": 4.99
+            "example": 0
           }
         },
         "type": "object",
@@ -8608,17 +23290,35 @@ export const EMBEDDED_SPEC = {
           "totalPaid"
         ]
       },
+      "Conflict409": {
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "A human-readable message providing more details about the error",
+            "example": "Conflict"
+          },
+          "details": {
+            "type": "string",
+            "description": "Additional context or information about the pricing error",
+            "example": "You are attempting to subscribe to an event you have already subscribed to."
+          }
+        }
+      },
       "DomainsRenewDomainBody": {
-        "description": "RenewDomainRequest passes the domain name and purchase parameters to the RenewDomain function.",
+        "description": "RenewDomainRequest passes the domain name and purchase parameters to the RenewDomain function.\nSee the [Domain pricing guide](/guides/domain-pricing) for how `purchasePrice` relates to Get Pricing `renewalPrice`.",
         "properties": {
           "purchasePrice": {
-            "description": "PurchasePrice is the amount in USD to pay for the domain renewal at the minimum renewal period (typically 1 year). If VAT tax applies, it will also be added automatically.\nPurchasePrice is required if this is a premium domain.",
+            "description": "PurchasePrice is the total USD renewal cost for the requested `years`, before VAT. VAT is applied when applicable and must not be included here. If sent, must match Get Pricing `renewalPrice` exactly. **Omit** for standard (non-premium) renewals. **Required** for premium renewals — use `renewalPrice` from [Get Pricing](/api/v1/reference/domains/get-pricing-for-domain) with matching `years`.",
             "format": "double",
             "type": "number",
             "example": 10.99
           },
           "years": {
-            "description": "Years specifies how many years to renew the domain for. Years defaults to the minimum time period (typically 1 year) if not passed and cannot be more than 10.  Some TLDs default to longer periods (e.g. .AI requires a 2 year renewal).",
+            "description": "Years specifies the renewal term in years. Defaults to each TLD's minimum registration term if omitted — usually 1 year (2 for `.ai`). Must be a supported registration term for the TLD (commonly 1–10 years). For premium renewals, call [Get Pricing](/api/v1/reference/domains/get-pricing-for-domain) with the same `years` value.",
             "format": "int32",
             "type": "integer",
             "example": 3
@@ -8650,10 +23350,13 @@ export const EMBEDDED_SPEC = {
         "description": "SetContactsRequest passes the contact info for each role to the SetContacts function.",
         "properties": {
           "contacts": {
-            "$ref": "#/components/schemas/Contacts"
+            "$ref": "#/components/schemas/ContactsRequest"
           }
         },
-        "type": "object"
+        "type": "object",
+        "required": [
+          "contacts"
+        ]
       },
       "DomainsSetNameserversBody": {
         "description": "SetNameserversRequest passes the list of nameservers to set for the SetNameserver function.",
@@ -8679,17 +23382,38 @@ export const EMBEDDED_SPEC = {
           ]
         }
       },
+      "SearchPurchaseType": {
+        "description": "Purchase Type indicates what kind of purchase a discovery result represents.\nReturned by [Search](/api/v1/reference/domains/search) and [Check Availability](/api/v1/reference/domains/check-availability) — not [Zone Check](/api/v1/reference/domains/zone-check).\n\nCopy the value to [Create Domain](/api/v1/reference/domains/create-domain) as `purchaseType`.\n\n**Recommendation:** Pass `registration` on Search and Check Availability unless you choose to support acquisition inventory. Other values are supported but add integration complexity.\n\n**Pricing by type:**\n\n- `registration` — Standard or registry premium. Check the `premium` flag: when `false`, omit `purchasePrice` on create (Get Pricing with matching `years` is optional for preview only); when `true`, `purchasePrice` is required from Get Pricing with matching `years`. `years` controls price and registration length.\n- `aftermarket_s`, `aftermarket_b`, `aftermarket_i` — Flat acquisition fee from Search or Check Availability; `purchasePrice` required. `years` does not multiply price or guarantee registration length — omit or pass TLD default.\n- `expiring`, `backorder` — Flat acquisition fee from Search or Check Availability; `purchasePrice` required. Get Pricing does not return these prices. `years` does not multiply price or guarantee registration length — omit or pass TLD default. Renew after acquisition to extend registration.\n\nSee the [Domain pricing guide](/guides/domain-pricing).\n",
+        "type": "string",
+        "enum": [
+          "registration",
+          "aftermarket_i",
+          "expiring",
+          "backorder",
+          "aftermarket_s",
+          "aftermarket_b"
+        ]
+      },
       "AvailabilityRequest": {
         "description": "Checks if one or more domain names are available for registration (up to 50 domains). Important: Do not encode the `:` in the path. Use `/core/v1/domains:checkAvailability`, not `/core/v1/domains%3AcheckAvailability`.",
         "properties": {
           "domainNames": {
             "description": "DomainNames is the list of domains to check if they are available.",
             "items": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "type": "array",
             "maxItems": 50,
             "minItems": 1
+          },
+          "purchaseType": {
+            "description": "Optional filter. **Recommended:** `registration` for most integrations — omit only if you support acquisition types. Non-matching domains are returned with `purchasable: false` (Search omits them instead). See the [Domain purchase pricing guide](/guides/domain-pricing).",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SearchPurchaseType"
+              }
+            ]
           }
         },
         "type": "object",
@@ -8698,7 +23422,7 @@ export const EMBEDDED_SPEC = {
         ]
       },
       "SearchResult": {
-        "description": "SearchResult is returned by the CheckAvailability, Search, and SearchStream functions.",
+        "description": "SearchResult is returned by the CheckAvailability and Search endpoints.",
         "properties": {
           "domainName": {
             "description": "DomainName is the punycode encoding of the result domain name.",
@@ -8706,7 +23430,7 @@ export const EMBEDDED_SPEC = {
             "example": "example.com"
           },
           "premium": {
-            "description": "Premium indicates that this search result is a premium result and the purchase_price needs to be passed to the DomainCreate command. This parameter will only be returned for domains that are purchasable.",
+            "description": "Premium indicates whether this discovery result has premium or non-standard pricing. Only returned for purchasable domains. When `true` with `purchaseType: registration` → registry premium (use [Get Pricing](/api/v1/reference/domains/get-pricing-for-domain) for multi-year totals). When `true` with aftermarket, expiring, or backorder `purchaseType` values → flat acquisition fee (use discovery `purchasePrice`; `years` on create does not multiply price or guarantee registration length). When `true`, `purchasePrice` must be passed on Create Domain.",
             "type": "boolean",
             "example": true
           },
@@ -8716,18 +23440,21 @@ export const EMBEDDED_SPEC = {
             "example": true
           },
           "purchasePrice": {
-            "description": "PurchasePrice is the price for purchasing this domain for the minimum time period (typically 1 year). Purchase_price is always in USD. This parameter will only be returned for domains that are purchasable.",
+            "description": "PurchasePrice is the minimum-term list or flat acquisition price from discovery, in USD. Only returned for purchasable domains. For `purchaseType: registration` when `purchasePrice` is required on create, use [Get Pricing](/api/v1/reference/domains/get-pricing-for-domain) with matching `years` instead. For aftermarket, expiring, and backorder types, pass this flat acquisition fee on Create Domain — not affected by `years`. Get Pricing does not return these acquisition prices. Recommended to re-check with Check Availability immediately before create for all types — prices can change.",
             "format": "double",
             "type": "number",
             "example": 10.99
           },
           "purchaseType": {
-            "description": "PurchaseType indicates what kind of purchase this result is for. It should be passed to the DomainCreate command. This parameter will only be returned for domains that are purchasable.",
-            "type": "string",
-            "example": "registration"
+            "description": "PurchaseType indicates what kind of purchase this discovery result is for. Only returned for purchasable domains. Pass to Create Domain as `purchaseType`. See [SearchPurchaseType](#/components/schemas/SearchPurchaseType) for pricing behavior per value. When `premium: true` or the type is not `registration`, follow the [Domain pricing guide](/guides/domain-pricing).",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SearchPurchaseType"
+              }
+            ]
           },
           "renewalPrice": {
-            "description": "RenewalPrice is the annual renewal price for this domain as it may be different than the purchase_price. This parameter will only be returned for domains that are purchasable.",
+            "description": "RenewalPrice is the minimum-term renewal total for this domain (typically 1 year; varies by TLD). Only returned for purchasable domains. Informational for standard [Renew Domain](/api/v1/reference/domains/renew-domain) flows — do **not** use to calculate Create Domain `purchasePrice` or multi-year create totals. For premium renewals, use `renewalPrice` from [Get Pricing](/api/v1/reference/domains/get-pricing-for-domain) with matching `years`, not this discovery value.",
             "format": "double",
             "type": "number",
             "example": 10.99
@@ -8741,6 +23468,10 @@ export const EMBEDDED_SPEC = {
             "description": "TLD is the rest of the domain_name after the SLD.",
             "type": "string",
             "example": "com"
+          },
+          "reason": {
+            "description": "Reason provides additional context when unavailable (e.g. registry is in maintenance).",
+            "type": "string"
           }
         },
         "type": "object",
@@ -8763,19 +23494,6 @@ export const EMBEDDED_SPEC = {
           }
         },
         "type": "object"
-      },
-      "BadGateway502": {
-        "type": "object",
-        "required": [
-          "message"
-        ],
-        "properties": {
-          "message": {
-            "type": "string",
-            "description": "A human-readable message providing more details about the error",
-            "example": "Registry Connection Unavailable"
-          }
-        }
       },
       "SearchRequest": {
         "description": "SearchRequest is used to specify the search parameters.",
@@ -8802,6 +23520,14 @@ export const EMBEDDED_SPEC = {
               "com",
               "net",
               "org"
+            ]
+          },
+          "purchaseType": {
+            "description": "Optional. Limits results to the given `purchaseType`. **Recommended:** `registration` for most integrations — omit only if you choose to support acquisition types. See the [Domain purchase pricing guide](/guides/domain-pricing).",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SearchPurchaseType"
+              }
             ]
           }
         },
@@ -8898,8 +23624,15 @@ export const EMBEDDED_SPEC = {
         "type": "string",
         "enum": [
           "account.credit.balance_change",
+          "account.domain.removal",
           "domain.lock.status_change",
-          "domain.transfer.status_change"
+          "domain.transfer.status_change",
+          "domain.transfer_out.status_change",
+          "contact.verification.status_change",
+          "domain.transfer.internal_in",
+          "domain.transfer.internal_out",
+          "domain.registry.rejection",
+          "domain.expiration"
         ]
       },
       "SubscribeToNotification": {
@@ -8932,24 +23665,6 @@ export const EMBEDDED_SPEC = {
         },
         "title": "Response from subscribing to a notification",
         "type": "object"
-      },
-      "Conflict409": {
-        "type": "object",
-        "required": [
-          "message"
-        ],
-        "properties": {
-          "message": {
-            "type": "string",
-            "description": "A human-readable message providing more details about the error",
-            "example": "Conflict"
-          },
-          "details": {
-            "type": "string",
-            "description": "Additional context or information about the pricing error",
-            "example": "You are attempting to subscribe to an event you have already subscribed to."
-          }
-        }
       },
       "ModifySubscriptionResponse": {
         "properties": {
@@ -9031,6 +23746,12 @@ export const EMBEDDED_SPEC = {
           "type": {
             "description": "Type is type of  the item ('registration', 'whois_privacy').",
             "type": "string"
+          },
+          "isRefundable": {
+            "description": "IsRefundable indicates whether the item in your order is currently eligible for a refund through the refund endpoint based on name.com's refund rules. These refunds are only applicable for invalid or fraudulent orders within a few days or registration (usually 5).",
+            "type": "boolean",
+            "example": true,
+            "default": false
           }
         },
         "type": "object",
@@ -9043,7 +23764,8 @@ export const EMBEDDED_SPEC = {
           "price",
           "quantity",
           "status",
-          "type"
+          "type",
+          "isRefundable"
         ]
       },
       "Order": {
@@ -9156,6 +23878,162 @@ export const EMBEDDED_SPEC = {
           "totalCount"
         ]
       },
+      "RefundRequest": {
+        "description": "RefundRequest contains the order and order items to be refunded. Only domain registrations and security products purchased within the Add Grace Period (AGP) are eligible for refunds.",
+        "type": "object",
+        "required": [
+          "orderId",
+          "orderItemIds"
+        ],
+        "properties": {
+          "orderId": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The unique identifier of the order containing the item(s) to be refunded. Use the List Orders endpoint to retrieve order IDs.",
+            "example": 123456
+          },
+          "orderItemIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "minItems": 1,
+            "description": "An array of order item IDs to be refunded. All items must belong to the specified order. Use the List Orders endpoint to retrieve order item IDs.\n",
+            "example": [
+              987654,
+              987655
+            ]
+          }
+        }
+      },
+      "RefundItemResult": {
+        "description": "RefundItemResult contains the result of a refund operation for a single order item.",
+        "type": "object",
+        "required": [
+          "orderId",
+          "orderItemId",
+          "orderItemStatus",
+          "refundAmount"
+        ],
+        "properties": {
+          "orderId": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The unique identifier of the Order that was processed.",
+            "example": 987654
+          },
+          "orderItemId": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The unique identifier of the Order Item that was processed.",
+            "example": 987654
+          },
+          "orderItemStatus": {
+            "type": "string",
+            "description": "The status of the refund operation for this item.",
+            "enum": [
+              "refunded",
+              "failed",
+              "initialized",
+              "canceled"
+            ],
+            "example": "refunded"
+          },
+          "refundAmount": {
+            "type": "number",
+            "format": "float",
+            "description": "The amount refunded for this order item in USD.",
+            "example": 10.99
+          },
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Additional information about the refund result, especially useful for failed items.",
+            "example": "Domain successfully deleted and refund processed."
+          }
+        }
+      },
+      "RefundResponse": {
+        "description": "RefundResponse contains the results of a refund operation, including the individual order item results.\nRefunds are issued to the original payment method on file. If the original payment method is unavailable, the refund will be credited to the account balance.\n",
+        "type": "object",
+        "required": [
+          "results",
+          "totalRefundAmount"
+        ],
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RefundItemResult"
+            },
+            "description": "An array of refund results for each order item that was processed.",
+            "minItems": 1
+          },
+          "totalRefundAmount": {
+            "type": "number",
+            "format": "float",
+            "description": "The total amount refunded across all order items in USD.",
+            "example": 21.98
+          }
+        }
+      },
+      "Locked423": {
+        "type": "object",
+        "description": "Error response returned when a resource is locked and cannot be modified. Used when the Add Grace Period (AGP) deletion window has expired.",
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "A human-readable message providing more details about the error",
+            "example": "Resource Locked"
+          },
+          "details": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Additional context or information about the error",
+            "example": "The Add Grace Period (AGP) deletion window has expired for this domain."
+          }
+        }
+      },
+      "BadGateway502": {
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "A human-readable message providing more details about the error",
+            "example": "Registry Connection Unavailable"
+          }
+        }
+      },
+      "TransferStatus": {
+        "type": "string",
+        "description": "Terminal (finished; will not change):\n- **completed**: Completed.\n- **failed**: Failed.\n- **canceled**: Canceled by the user.\n- **canceled_pending_refund**: Canceled; refund processing.\n\nNon-terminal (in progress; may change):\n- **pending**: Requested.\n- **submitting_transfer**: Being submitted to the registry.\n- **pending_new_auth_code**: New auth code required.\n- **pending_unlock**: Waiting for losing registrar unlock.\n- **pending_registry_unlock**: Waiting for registry unlock.\n- **pending_transfer**: Pending at the registry.\n- **pending_insert**: Transfer complete; domain will be added to the account.\n- **rejected**: Rejected at the losing registrar.\n",
+        "enum": [
+          "canceled",
+          "canceled_pending_refund",
+          "completed",
+          "failed",
+          "pending",
+          "pending_insert",
+          "pending_new_auth_code",
+          "pending_registry_unlock",
+          "pending_transfer",
+          "pending_unlock",
+          "rejected",
+          "submitting_transfer"
+        ],
+        "example": "pending_transfer"
+      },
       "Transfer": {
         "description": "Transfer contains all relevant data for a domain transfer to name.com.",
         "type": "object",
@@ -9172,22 +24050,7 @@ export const EMBEDDED_SPEC = {
             "example": "admin@example.com"
           },
           "status": {
-            "description": "The updated status of the domain transfer. The transfer status will be one of the following values:\n  - **canceled:** The transfer has been canceled by the user.\n  - **canceled_pending_refund**: The transfer has been canceled by the user, and a refund for the price is being processed.\n  - **completed**: The transfer has completed.\n  - **failed**: The transfer has failed, and will not be retried.\n  - **pending**: The transfer has been requested, and is pending.\n  - **pending_insert**: The transfer has completed and the domain will soon be inserted into the account.\n  - **pending_new_auth_code**: A new authcode is required to complete the transfer.\n  - **pending_transfer**: The transfer has been requested, and is pending.\n  - **pending_unlock**: The domain to be transferred is currently in a locked state at the losing registrar, and will begin processing once the lock has been removed.\n  - **rejected**: The transfer has been rejected at the losing registrar and will not be retried.\n  - **submitting_transfer**: The transfer has been initiated and will soon be submitted to the registry.",
-            "type": "string",
-            "example": "pending_transfer",
-            "enum": [
-              "canceled",
-              "canceled_pending_refund",
-              "completed",
-              "failed",
-              "pending",
-              "pending_insert",
-              "pending_new_auth_code",
-              "pending_transfer",
-              "pending_unlock",
-              "rejected",
-              "submitting_transfer"
-            ]
+            "$ref": "#/components/schemas/TransferStatus"
           }
         },
         "required": [
@@ -9240,7 +24103,7 @@ export const EMBEDDED_SPEC = {
         ]
       },
       "CreateTransferRequest": {
-        "description": "CreateTransferRequest passes the required transfer info to the CreateTransfer function.",
+        "description": "CreateTransferRequest passes the required transfer info to the CreateTransfer function.\nSee the [Domain pricing guide](/guides/domain-pricing) for how `purchasePrice` relates to [Get Pricing](/api/v1/reference/domains/get-pricing-for-domain) `transferPrice`.",
         "properties": {
           "authCode": {
             "description": "AuthCode is the authorization code for the transfer. Not all TLDs require authorization codes, but most do.",
@@ -9255,12 +24118,12 @@ export const EMBEDDED_SPEC = {
             "minLength": 1
           },
           "privacyEnabled": {
-            "description": "PrivacyEnabled is a flag on whether to purchase Whois Privacy with the transfer.",
+            "description": "Whether to include Whois Privacy with the transfer. Whois Privacy is free. If omitted, the account default from account settings is used. Privacy is only added when the TLD supports it.",
             "type": "boolean",
             "example": true
           },
           "purchasePrice": {
-            "description": "PurchasePrice is the amount to pay for the transfer of the domain. If privacy_enabled is set, the regular price for Whois Privacy will be added automatically. If VAT tax applies, it will also be added automatically.\nPurchasePrice is required if the domain to transfer is a premium domain.",
+            "description": "PurchasePrice is the USD inbound transfer fee, before VAT. VAT is applied when applicable and must not be included here. If sent, must match Get Pricing `transferPrice` exactly or the request will fail.. **Omit** for standard (non-premium) transfers. **Required** for premium transfers — use `transferPrice` from [Get Pricing](/api/v1/reference/domains/get-pricing-for-domain).",
             "format": "double",
             "type": "number",
             "example": 12.99
@@ -9282,13 +24145,35 @@ export const EMBEDDED_SPEC = {
             "example": 12345
           },
           "totalPaid": {
-            "description": "TotalPaid is the total amount paid, including VAT and Whois Privacy.",
+            "description": "TotalPaid is the total amount paid, including VAT when applicable. Whois Privacy is free and is not included in this amount.",
             "format": "double",
             "type": "number",
             "example": 12.99
           },
           "transfer": {
             "$ref": "#/components/schemas/Transfer"
+          },
+          "warnings": {
+            "description": "Optional transfer warnings surfaced by the API when non-blocking registry statuses are detected.",
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string",
+                "description": "Brief guidance for resolving potential transfer issues.",
+                "example": "Domain has registry statuses that may prevent a successful transfer. Please ensure the domain is unlocked and eligible at the losing registrar."
+              },
+              "statuses": {
+                "type": "array",
+                "description": "Registry status values that triggered the warning.",
+                "items": {
+                  "type": "string"
+                },
+                "example": [
+                  "clientTransferProhibited",
+                  "clientUpdateProhibited"
+                ]
+              }
+            }
           }
         },
         "type": "object",
@@ -9297,6 +24182,95 @@ export const EMBEDDED_SPEC = {
           "totalPaid",
           "transfer"
         ]
+      },
+      "GatewayTimeout504": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "A human-readable message providing more details about the error",
+            "example": "Unable to retrieve domain status"
+          }
+        }
+      },
+      "CancelTransferOutResponse": {
+        "type": "object",
+        "description": "Response after successfully canceling a domain transfer out request.",
+        "required": [
+          "domainName",
+          "status"
+        ],
+        "properties": {
+          "domainName": {
+            "type": "string",
+            "description": "The punycode-encoded domain name.",
+            "example": "example.com"
+          },
+          "status": {
+            "type": "string",
+            "description": "The transfer-out status after the operation (e.g. canceled when the cancel succeeded).",
+            "enum": [
+              "canceled"
+            ],
+            "example": "canceled"
+          }
+        }
+      },
+      "CreateInternalTransferInRequest": {
+        "description": "Request body for transferring a domain from another name.com account into the authenticated reseller (gaining) account.",
+        "properties": {
+          "domainName": {
+            "description": "Fully qualified domain name to transfer in. The domain must be registered in another name.com account (the losing account).",
+            "type": "string",
+            "example": "example.com",
+            "minLength": 1
+          },
+          "authCode": {
+            "description": "Transfer authorization code (EPP/auth code) for the domain. The losing account holder must obtain this code from the [name.com](https://www.name.com) dashboard; it is not exposed by this API for the losing account.",
+            "type": "string",
+            "example": "ABC123",
+            "minLength": 1
+          },
+          "contacts": {
+            "description": "WHOIS contacts to apply after the transfer. If omitted, the gaining account's default contacts are applied. If provided, include any roles to override; omitted roles use the gaining account's default contacts. Each supplied role must include complete contact fields. A registrar contact-change transfer lock may apply according to the gaining account's settings, consistent with the Set Contacts endpoint.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ContactsRequest"
+              }
+            ]
+          }
+        },
+        "required": [
+          "domainName",
+          "authCode"
+        ],
+        "type": "object"
+      },
+      "TransferEligibilityResponse": {
+        "description": "Result of a transfer eligibility check. Indicates whether the domain is currently registered at name.com (in any account) and whether the TLD supports internal transfer between name.com accounts.",
+        "type": "object",
+        "required": [
+          "domainName",
+          "atName",
+          "supportsInternalTransfer"
+        ],
+        "properties": {
+          "domainName": {
+            "description": "The domain that was checked, in its canonical (ASCII / punycode) form.",
+            "type": "string",
+            "example": "example.com"
+          },
+          "atName": {
+            "description": "Whether the domain is currently registered at name.com (in any account).",
+            "type": "boolean",
+            "example": true
+          },
+          "supportsInternalTransfer": {
+            "description": "Whether the TLD supports internal transfer between name.com accounts. Mirrors the TLD-level flag returned by Get Tld Requirements. Does not reflect per-account allowlist eligibility for the internal transfer-in API.",
+            "type": "boolean",
+            "example": true
+          }
+        }
       },
       "ResellerTldInfo": {
         "description": "General information about a TLD and it's various requirements. This is not a comprehensive list of all information related to a TLD.",
@@ -9332,6 +24306,11 @@ export const EMBEDDED_SPEC = {
             "type": "boolean",
             "example": true
           },
+          "supportsInternalTransfer": {
+            "description": "Whether the TLD supports internal transfer between reseller accounts.",
+            "type": "boolean",
+            "example": true
+          },
           "requiresPreDelegation": {
             "description": "Whether this TLD requires pre-delegation. If this is true, these domains must be added to the name servers before the domain creation is completed.",
             "type": "boolean",
@@ -9339,7 +24318,7 @@ export const EMBEDDED_SPEC = {
           },
           "expirationGracePeriod": {
             "description": "The number of days you have to renew your domain after it has expired, but before it is removed from your account.",
-            "type": "number",
+            "type": "integer",
             "format": "int32",
             "example": 25
           },
@@ -9347,7 +24326,7 @@ export const EMBEDDED_SPEC = {
             "description": "The years that a domain is allowed to be registered for.",
             "type": "array",
             "items": {
-              "type": "number"
+              "type": "integer"
             },
             "example": [
               1,
@@ -9378,18 +24357,44 @@ export const EMBEDDED_SPEC = {
           },
           "minDomainLength": {
             "description": "The minimum allowed length for the second level domain (SLD) for a given TLD. The SLD would be the `example` part of `example.com`. Attempts to register a domain with a shorter length than allowed will result in a failure of a Create Domain request.",
-            "type": "number",
+            "type": "integer",
             "format": "int32",
             "example": 3
           },
           "minIdnDomainLength": {
             "description": "The minimum allowed length for the second level domain (SLD) that utilizes an IDN character for a given TLD.  The SLD would be the `èxample` part of `èxample.com`. Attempts to register a domain with a shorter length than allowed will result in a failure of a Create Domain request. This value will often be different from the `minDomainLength` for non-IDN registrations.  This parameter will return as `null` for any TLDs that do not support IDN registrations.",
             "type": [
-              "number",
+              "integer",
               "null"
             ],
             "format": "int32",
             "example": 5
+          },
+          "registryOperator": {
+            "description": "The registry that operates the given TLD.",
+            "type": "string",
+            "example": "verisign"
+          },
+          "claimsCheckRequired": {
+            "description": "Array of valid purchase types if claims check is required for this TLD for current date/time.  If claims checking is required, returns an array of valid purchase types (e.g., [\"registration\", \"landrush_eap\"]).  If claims checking is not required, returns an empty array [].",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "registration",
+                "landrush_eap",
+                "landrush_auction_a",
+                "landrush_reserve_a"
+              ]
+            },
+            "example": [
+              "registration"
+            ]
+          },
+          "requireIdnSld": {
+            "description": "When true, the TLD only accepts IDN (punycode) second-level domain names in the required script. ASCII/Latin SLDs are not valid for registration.",
+            "type": "boolean",
+            "example": false
           }
         },
         "required": [
@@ -9399,13 +24404,17 @@ export const EMBEDDED_SPEC = {
           "supportsDnssec",
           "supportsPremium",
           "supportsPrivacy",
+          "supportsInternalTransfer",
           "requiresPreDelegation",
           "expirationGracePeriod",
           "idnLanguages",
           "allowedRegistrationYears",
           "hsts",
           "minDomainLength",
-          "minIdnDomainLength"
+          "minIdnDomainLength",
+          "registryOperator",
+          "claimsCheckRequired",
+          "requireIdnSld"
         ]
       },
       "RequirementField": {
@@ -9559,6 +24568,83 @@ export const EMBEDDED_SPEC = {
           }
         }
       },
+      "ContactsRequirement": {
+        "description": "ContactsRequirement defines the registration requirements for contact fields for a specific TLD, including required fields, validation rules, and conditional logic. This follows the RequirementField structure with contact roles as nested fields.",
+        "type": "object",
+        "required": [
+          "type",
+          "required"
+        ],
+        "properties": {
+          "description": {
+            "description": "A detailed description of the contact requirements for this TLD, including eligibility criteria, restrictions, and important notes.",
+            "type": "string",
+            "example": "The contacts required to be submitted for registration"
+          },
+          "type": {
+            "description": "The requirement type, which will be \"string\" for contacts.",
+            "type": "string",
+            "example": "string"
+          },
+          "required": {
+            "description": "Whether contact information is mandatory for domain registration.",
+            "oneOf": [
+              {
+                "type": "boolean",
+                "example": true
+              },
+              {
+                "type": "string",
+                "example": "true"
+              }
+            ],
+            "example": true
+          },
+          "label": {
+            "description": "A user-friendly label for the contacts field.",
+            "type": "string",
+            "example": "contacts"
+          },
+          "fields": {
+            "description": "An object containing contact roles (registrant, tech, admin, etc.) with their individual field requirements.",
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "description": "Contact role requirements (e.g., registrant, tech, admin)",
+              "properties": {
+                "description": {
+                  "description": "Description of the contact role requirements.",
+                  "type": "string"
+                },
+                "type": {
+                  "description": "The requirement type for this contact role.",
+                  "type": "string",
+                  "example": "string"
+                },
+                "required": {
+                  "description": "Whether this contact role is required.",
+                  "oneOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ],
+                  "example": true
+                },
+                "fields": {
+                  "description": "Individual contact fields for this role, following RequirementField structure.",
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/components/schemas/RequirementField"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
       "Requirement": {
         "description": "Requirement defines the registration requirements for a specific TLD, including required fields, validation rules, and conditional logic.",
         "type": "object",
@@ -9585,6 +24671,10 @@ export const EMBEDDED_SPEC = {
             "description": "General information about a specific TLD. These are not registration requirements, but contain useful information for domain reseller and domain registrants in general.",
             "$ref": "#/components/schemas/ResellerTldInfo"
           },
+          "contacts": {
+            "description": "The registration requirements for the contacts for this TLD, including required fields, validation rules, and conditional logic.  This field will always be present but may be an empty object when no specific requirements exist for the TLD.\nOnly a few CC Tlds have specific contact requirements. These contacts must be submitted as part of the domain object when registering a domain, and not part of the `tldRequirements` parameter.\nPlease check the contact requirements carefully, as different fields may be required for different roles, and there may be additional validation rules that must be followed.",
+            "$ref": "#/components/schemas/ContactsRequirement"
+          },
           "requirements": {
             "description": "The registration requirements for this TLD, including required fields, validation rules, and conditional logic. This field will always be present but may be an empty object when no specific requirements exist for the TLD.",
             "$ref": "#/components/schemas/Requirement"
@@ -9592,8 +24682,133 @@ export const EMBEDDED_SPEC = {
         },
         "required": [
           "requirements",
-          "tldInfo"
+          "tldInfo",
+          "contacts"
         ]
+      },
+      "DomainClaimsCheckRequest": {
+        "type": "object",
+        "description": "Request parameters for domain claims checking",
+        "properties": {
+          "purchaseType": {
+            "type": "string",
+            "description": "The type of purchase/registration for which to check claims. Defaults to 'registration'. Other values like 'landrush_eap', 'landrush_auction_a', 'landrush_reserve_a' may be used during new gTLD launches.",
+            "default": "registration",
+            "enum": [
+              "registration",
+              "landrush_eap",
+              "landrush_auction_a",
+              "landrush_reserve_a"
+            ],
+            "example": "registration"
+          }
+        }
+      },
+      "TrademarkClaim": {
+        "type": "object",
+        "description": "Information about a specific trademark claim",
+        "required": [
+          "trademark",
+          "holder"
+        ],
+        "properties": {
+          "trademark": {
+            "type": "string",
+            "description": "The trademark text that matches the domain",
+            "example": "TikTok"
+          },
+          "holder": {
+            "type": "string",
+            "description": "The entity that holds the trademark",
+            "example": "ByteDance Ltd."
+          },
+          "jurisdiction": {
+            "type": "string",
+            "description": "The jurisdiction where the trademark is registered",
+            "example": "US"
+          },
+          "registrationNumber": {
+            "type": "string",
+            "description": "The trademark registration number",
+            "example": "US123456789"
+          },
+          "description": {
+            "type": "string",
+            "description": "Additional description of the trademark",
+            "example": "Social media platform trademark"
+          },
+          "noticeHtml": {
+            "type": "string",
+            "description": "HTML content to display about this specific trademark claim",
+            "example": "<div class='trademark-notice'>This domain may infringe on the TikTok trademark held by ByteDance Ltd.</div>"
+          },
+          "confidence": {
+            "type": "number",
+            "format": "float",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Confidence score for the trademark match (0.0 to 1.0)",
+            "example": 0.95
+          }
+        }
+      },
+      "DomainClaimsCheckResponse": {
+        "type": "object",
+        "description": "Response containing domain-specific claims data and trademark information",
+        "required": [
+          "domain",
+          "claims"
+        ],
+        "properties": {
+          "domain": {
+            "type": "string",
+            "description": "The domain name that was checked for claims",
+            "example": "tiktok.page"
+          },
+          "claims": {
+            "type": "array",
+            "description": "List of trademark claims found against this domain",
+            "items": {
+              "$ref": "#/components/schemas/TrademarkClaim"
+            }
+          },
+          "claimsProcessActive": {
+            "type": "boolean",
+            "description": "Whether the TLD of this domain requires claims checking",
+            "example": true
+          },
+          "claimId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The claim identifier from TMCH (null if no claims found)",
+            "example": "8c3027d30000000000382500785"
+          },
+          "notBefore": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "The date before which the claim acknowledgment is not valid (null if no claims found)",
+            "example": "2024-01-15T10:30:00Z"
+          },
+          "notAfter": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "The date after which the claim acknowledgment expires (null if no claims found)",
+            "example": "2024-01-15T10:30:00Z"
+          },
+          "claimsNotice": {
+            "type": "string",
+            "description": "Markdown content to display about this specific trademark claim",
+            "example": "**This domain may infringe on a trademark claim. Proceeding with registration acknowledges that you have received notice of this claim.**"
+          }
+        }
       },
       "TldPriceListEntry": {
         "description": "The pricing for an individual TLD.\n\nPlease note that if `null` is returned for any of the prices, it means that particular product is unavailable at name.com.\n\nFor example, if `registrationPrice` returns as `null` in the response, it means that name.com is not currently accepting registrations for that TLD.\n",
@@ -9605,12 +24820,12 @@ export const EMBEDDED_SPEC = {
           },
           "duration": {
             "description": "The number of years this pricing is for",
-            "type": "number",
+            "type": "integer",
             "format": "int32",
             "example": 1
           },
           "registrationPrice": {
-            "description": "This your account level price in US Dollars (USD) and is the price you pay for non-premium registrations. It includes applicable rebates, promotions and/or sales.",
+            "description": "This is your account level price in US Dollars (USD) and is the price you pay for non-premium registrations. It includes applicable rebates, promotions and/or account-level discounts.",
             "type": [
               "number",
               "null"
@@ -9618,8 +24833,17 @@ export const EMBEDDED_SPEC = {
             "format": "double",
             "example": 9.99
           },
+          "registrationRetailPrice": {
+            "description": "This is the current retail price on name.com in US Dollars (USD) after including rebates, promotions and/or sales for registering non-premium domains.",
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "example": 10.99
+          },
           "registrationOriginalPrice": {
-            "description": "Price in US Dollars (USD) before any rebates, promotions and/or sales when registering non-premium domains.",
+            "description": "This is name.com's suggested retail price (MSRP) in US Dollars (USD) before any discounts for registering non-premium domains.",
             "type": [
               "number",
               "null"
@@ -9628,7 +24852,7 @@ export const EMBEDDED_SPEC = {
             "example": 11.99
           },
           "renewalPrice": {
-            "description": "This your account level price in US Dollars (USD) and is the price you pay for renewals. It includes applicable rebates, promotions and/or sales.",
+            "description": "This is your account level price in US Dollars (USD) and is the price you pay for non-premium renewals. It includes applicable rebates, promotions and/or account-level discounts.",
             "type": [
               "number",
               "null"
@@ -9636,8 +24860,26 @@ export const EMBEDDED_SPEC = {
             "format": "double",
             "example": 9.99
           },
+          "renewalRetailPrice": {
+            "description": "This is the current retail price on name.com in US Dollars (USD) after including rebates, promotions and/or sales for renewals of non-premium domains.",
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "example": 10.99
+          },
+          "renewalOriginalPrice": {
+            "description": "This is name.com's suggested retail price (MSRP) in US Dollars (USD) before any discounts for renewals of non-premium domains.",
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "example": 11.99
+          },
           "domainRestorationPrice": {
-            "description": "This your account level price in US Dollars (USD) and is the price you pay for domain restorations. It includes applicable rebates, promotions and/or sales.",
+            "description": "This is your account level price in US Dollars (USD) and is the price you pay for non-premium restorations. It includes applicable rebates, promotions and/or account-level discounts.",
             "type": [
               "number",
               "null"
@@ -9645,24 +24887,67 @@ export const EMBEDDED_SPEC = {
             "format": "double",
             "example": 120.99
           },
+          "domainRestorationRetailPrice": {
+            "description": "This is the current retail price on name.com in US Dollars (USD) after including rebates, promotions and/or sales for restorations of non-premium domains.",
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "example": 130.99
+          },
+          "domainRestorationOriginalPrice": {
+            "description": "This is name.com's suggested retail price (MSRP) in US Dollars (USD) before any discounts for restoration of non-premium domains.",
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "example": 140.99
+          },
           "transferInPrice": {
-            "description": "This your account level price in US Dollars (USD) and is the price you pay for transferring a domain to management at name.com. It includes applicable rebates, promotions and/or sales.",
+            "description": "This is your account level price in US Dollars (USD) and is the price you pay for non-premium transfers. It includes applicable rebates, promotions and/or account-level discounts.",
             "type": [
               "number",
               "null"
             ],
             "format": "double",
             "example": 19.99
+          },
+          "transferInRetailPrice": {
+            "description": "This is the current retail price on name.com in US Dollars (USD) after including rebates, promotions and/or sales for transfers of non-premium domains.",
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "example": 20.99
+          },
+          "transferInOriginalPrice": {
+            "description": "This is name.com's suggested retail price (MSRP) in US Dollars (USD) before any discounts for transfer of non-premium domains.",
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "example": 21.99
           }
         },
         "required": [
           "tld",
           "duration",
           "registrationPrice",
+          "registrationRetailPrice",
           "registrationOriginalPrice",
           "renewalPrice",
+          "renewalRetailPrice",
+          "renewalOriginalPrice",
           "domainRestorationPrice",
-          "transferInPrice"
+          "domainRestorationRetailPrice",
+          "domainRestorationOriginalPrice",
+          "transferInPrice",
+          "transferInRetailPrice",
+          "transferInOriginalPrice"
         ]
       },
       "TldPriceListResponse": {
@@ -9717,10 +25002,11 @@ export const EMBEDDED_SPEC = {
         "type": "object",
         "properties": {
           "domainNames": {
-            "description": "Array of domains to check",
+            "description": "Array of domain names to check. Each entry is normalized and validated before zone check runs. Entries that are not valid domain strings,  that use unsupported TLDs for this service, or that fail other pre-validation rules are omitted from the check; the response `removed` field  reports how many were omitted (not which values).\n\n**Valid domain string (after normalization)** — for reliable results and to avoid errors once all entries are removed:\n\n- **Allowed characters:** ASCII letters (`a`–`z`), digits (`0`–`9`), and hyphens (`-`).\n\n- **Hyphen rules:** A domain (the part between dots) must not start or end with a hyphen (for example, `-test.com` and `test-.com` are invalid).\n\n- **Domain length:** Each domain must be between 1 and 63 characters.\n\n- **Internationalized domains (IDNs):** Non-ASCII characters (for example `ö` or `ñ`) should be submitted as Punycode (`xn--...`) for  consistent registry resolution.",
             "type": "array",
             "items": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "minItems": 1,
             "maxItems": 500,
@@ -9780,13 +25066,13 @@ export const EMBEDDED_SPEC = {
           },
           "total": {
             "description": "Total number of records checked",
-            "type": "number",
+            "type": "integer",
             "format": "int32",
             "example": 5
           },
           "removed": {
-            "description": "Total number of domains removed from the check because they are invalid",
-            "type": "number",
+            "description": "Number of domain strings removed during pre-validation (invalid format, unsupported TLD for this service, etc.). This is a count only;  the response does not list which strings were removed.",
+            "type": "integer",
             "format": "int32",
             "example": 1
           }
@@ -9824,8 +25110,8 @@ export const EMBEDDED_SPEC = {
         "description": "The pertinent information used to identifiy a domain contact that requires verification as per ICANN requirements.",
         "properties": {
           "verificationId": {
-            "description": "The id of the verification record for the contact. Please note, this is different than the `contact_id` that may be returned in other API contexts. This id specifically relates to the verification and will be different than an `contact_id` for the same contact record in other contexts.",
-            "type": "number",
+            "description": "The id of the verification record for the contact. Please note, this is different than the `contact_id` that may be returned in other API contexts. This id specifically relates to the verification record and will be different than a `contact_id` for the same contact record in other contexts.",
+            "type": "integer",
             "format": "int64",
             "example": 4897668
           },
@@ -9918,15 +25204,243 @@ export const EMBEDDED_SPEC = {
           "totalCount"
         ]
       },
+      "ContactVerificationResendResponse": {
+        "description": "Response for resending a contact verification email.",
+        "type": "object",
+        "properties": {
+          "sent": {
+            "type": "boolean",
+            "description": "Whether a verification email was sent as a result of this request.",
+            "example": true
+          },
+          "verificationId": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The verificationId for the contact verification record.",
+            "example": 98752463
+          },
+          "nextEligibleAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the client can attempt to resend again, as an RFC3339/ISO-8601 UTC timestamp. This field is always returned, including when throttling applies.",
+            "example": "2026-01-14T12:15:00Z"
+          }
+        },
+        "required": [
+          "sent",
+          "verificationId",
+          "nextEligibleAt"
+        ]
+      },
+      "TldInfoJsonSchema": {
+        "description": "A JSON Schema Draft 7 definition for tldInfo that wraps ResellerTldInfo with readOnly metadata. This schema can be referenced in JSON Schema documents using $ref.",
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ResellerTldInfo"
+          }
+        ],
+        "readOnly": true
+      },
+      "RequirementsJsonSchema": {
+        "description": "A JSON Schema Draft 7 document that describes the registration requirements for a TLD. This schema follows the JSON Schema Draft 7 specification (http://json-schema.org/draft-07/schema#) and can be used directly by form generation and validation libraries that consume JSON Schema.\nThe schema structure includes: - A `tldInfo` property containing general TLD information (read-only, always present) - A `contacts` property containing contact field requirements (e.g., registrant, admin, tech) - A `tldRequirements` property containing TLD-specific registration fields\nThe `contacts` and `tldRequirements` properties may be empty objects, while `tldInfo` will always contain data. The exact structure varies by TLD, as different TLDs have different registration requirements.",
+        "type": "object",
+        "properties": {
+          "$schema": {
+            "description": "The JSON Schema version identifier, should be \"http://json-schema.org/draft-07/schema#\"",
+            "type": "string",
+            "example": "http://json-schema.org/draft-07/schema#"
+          },
+          "type": {
+            "description": "The JSON Schema type, typically \"object\" for requirement schemas",
+            "type": "string",
+            "example": "object"
+          },
+          "title": {
+            "description": "A human-readable title for the schema",
+            "type": "string",
+            "example": ".it Domain Registration Requirements Schema"
+          },
+          "description": {
+            "description": "A detailed description of the registration requirements",
+            "type": "string",
+            "example": "Registration requirements for .it domains"
+          },
+          "properties": {
+            "description": "An object containing the schema properties. Includes: - `tldInfo`: An object containing general TLD information (read-only) - `contacts`: An object defining contact field requirements - `tldRequirements`: An object defining TLD-specific registration fields",
+            "type": "object",
+            "properties": {
+              "tldInfo": {
+                "description": "General information about a TLD and it's various requirements. This is not a comprehensive list of all information related to a TLD.  The structure matches ResellerTldInfo schema. In JSON Schema document examples, this property will contain a schema definition object  with `allOf` referencing ResellerTldInfo and `readOnly: true`.",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/TldInfoJsonSchema"
+                  }
+                ]
+              },
+              "contacts": {
+                "description": "An object defining contact field requirements. May be an empty object if no contact requirements exist for the TLD.",
+                "type": "object",
+                "additionalProperties": true
+              },
+              "tldRequirements": {
+                "description": "An object defining TLD-specific registration fields. May be an empty object if no TLD-specific requirements exist.",
+                "type": "object",
+                "additionalProperties": true
+              }
+            },
+            "additionalProperties": false
+          },
+          "required": {
+            "description": "An array of required property names",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "tldInfo",
+              "contacts",
+              "tldRequirements"
+            ]
+          },
+          "allOf": {
+            "description": "An array of schema objects that must all be valid. Used for conditional validation with multiple conditions.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "if": {
+            "description": "The condition schema for conditional validation. When this condition is true, the 'then' schema applies.",
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": true
+          },
+          "then": {
+            "description": "The schema to apply when the 'if' condition is true.",
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": true
+          },
+          "else": {
+            "description": "The schema to apply when the 'if' condition is false (optional).",
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": true
+          }
+        },
+        "example": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "title": ".it Domain Registration Requirements Schema",
+          "description": "Registration requirements for .it domains",
+          "properties": {
+            "tldInfo": {
+              "tld": ".it",
+              "ccTld": true,
+              "supportsTransferLock": true,
+              "supportsDnssec": true,
+              "supportsPremium": false,
+              "supportsPrivacy": false,
+              "supportsInternalTransfer": true,
+              "requiresPreDelegation": false,
+              "expirationGracePeriod": 25,
+              "allowedRegistrationYears": [
+                1,
+                3,
+                5,
+                8,
+                10
+              ],
+              "idnLanguages": {
+                "IT": "Italian"
+              },
+              "hsts": false,
+              "minDomainLength": 3,
+              "minIdnDomainLength": 5,
+              "registryOperator": "nic.it",
+              "claimsCheckRequired": [],
+              "requireIdnSld": false,
+              "readOnly": true
+            },
+            "contacts": {
+              "type": "object",
+              "properties": {
+                "registrant": {
+                  "type": "object",
+                  "properties": {
+                    "firstName": {
+                      "type": "string",
+                      "title": "First Name",
+                      "description": "First name of registrant contact"
+                    },
+                    "email": {
+                      "type": "string",
+                      "format": "email",
+                      "title": "Email",
+                      "description": "Email address of registrant contact"
+                    }
+                  },
+                  "required": [
+                    "firstName",
+                    "email"
+                  ]
+                }
+              },
+              "required": [
+                "registrant"
+              ]
+            },
+            "tldRequirements": {
+              "type": "object",
+              "properties": {
+                "X-IT-ENTITY-TYPE": {
+                  "type": "string",
+                  "title": "Registrant Entity Type",
+                  "enum": [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                    "6",
+                    "7"
+                  ]
+                },
+                "X-IT-PIN": {
+                  "type": "string",
+                  "title": ".IT PIN number",
+                  "description": "16 alphanumeric characters (tax code) for natural persons or 11 digits (VAT number) for organizations"
+                }
+              }
+            }
+          },
+          "required": [
+            "tldInfo",
+            "contacts",
+            "tldRequirements"
+          ]
+        }
+      },
       "AccountCreditBalanceChange": {
         "type": "object",
         "properties": {
           "eventName": {
             "type": "string",
+            "enum": [
+              "account.credit.balance_change"
+            ],
             "description": "The name of the subscription event"
           },
           "accountId": {
-            "type": "number",
+            "type": "integer",
             "format": "int64",
             "description": "The account ID the subscription is for"
           },
@@ -9934,6 +25448,46 @@ export const EMBEDDED_SPEC = {
             "type": "number",
             "format": "double",
             "description": "The remaining balance of account credit"
+          }
+        }
+      },
+      "AccountDomainRemoval": {
+        "type": "object",
+        "required": [
+          "eventName",
+          "domainName",
+          "reason",
+          "expireDate"
+        ],
+        "description": "Payload sent when a domain is removed from the subscribing account.",
+        "properties": {
+          "eventName": {
+            "type": "string",
+            "enum": [
+              "account.domain.removal"
+            ],
+            "description": "The name of the subscription event"
+          },
+          "domainName": {
+            "type": "string",
+            "description": "The name of the domain that was removed",
+            "example": "example.com"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why the domain left inventory: `expiration` (registry delete / post-expiry inventory loss), `agp_refund` (AGP refund delete), or `administrative` (ops/support removal).",
+            "enum": [
+              "expiration",
+              "agp_refund",
+              "administrative"
+            ],
+            "example": "expiration"
+          },
+          "expireDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The date and time when the domain expired",
+            "example": "2026-08-15T00:00:00Z"
           }
         }
       },
@@ -9975,7 +25529,8 @@ export const EMBEDDED_SPEC = {
               "ClientHold",
               "VerificationClientHold",
               "VerificationHold",
-              "PrivacyLock"
+              "PrivacyLock",
+              "ExpirationClientHold"
             ]
           },
           "registryStatuses": {
@@ -9994,31 +25549,22 @@ export const EMBEDDED_SPEC = {
       },
       "DomainTransferStatusChange": {
         "type": "object",
+        "description": "Payload sent when a domain transfer IN to name.com is processing. This schema represents transfer-in events where name.com is the gaining registrar.\n",
         "properties": {
           "eventName": {
             "type": "string",
+            "enum": [
+              "domain.transfer.status_change"
+            ],
             "description": "The name of the subscription event"
           },
           "domainName": {
             "type": "string",
-            "description": "The domain that the transfer status has changed for"
+            "description": "The domain that the transfer status has changed for",
+            "example": "example.com"
           },
           "status": {
-            "type": "string",
-            "description": "The updated status of the domain transfer. The transfer status will be one of the following values:\n- **canceled:** The transfer has been canceled by the user.\n- **canceled_pending_refund**: The transfer has been canceled by the user, and a refund for the price is being processed.\n- **completed**: The transfer has completed.\n- **failed**: The transfer has failed, and will not be retried.\n- **pending**: The transfer has been requested, and is pending.\n- **pending_insert**: The transfer has completed and the domain will soon be inserted into the account.\n- **pending_new_auth_code**: A new authcode is required to complete the transfer.\n- **pending_transfer**: The transfer has been requested, and is pending.\n- **pending_unlock**: The domain to be transferred is currently in a locked state at the losing registrar, and will begin processing once the lock has been removed.\n- **rejected**: The transfer has been rejected at the losing registrar and will not be retried.\n- **submitting_transfer**: The transfer has been initiated and will soon be submitted to the registry.\n",
-            "enum": [
-              "canceled",
-              "canceled_pending_refund",
-              "completed",
-              "failed",
-              "pending",
-              "pending_insert",
-              "pending_new_auth_code",
-              "pending_transfer",
-              "pending_unlock",
-              "rejected",
-              "submitting_transfer"
-            ]
+            "$ref": "#/components/schemas/TransferStatus"
           }
         },
         "required": [
@@ -10026,6 +25572,297 @@ export const EMBEDDED_SPEC = {
           "domainName",
           "status"
         ]
+      },
+      "DomainTransferOutStatusChange": {
+        "type": "object",
+        "description": "Payload for `domain.transfer_out.status_change`. `completed` means the domain left name.com. `canceled` means the outbound transfer is no longer pending at the registry.",
+        "required": [
+          "eventName",
+          "domainName",
+          "status"
+        ],
+        "properties": {
+          "eventName": {
+            "type": "string",
+            "enum": [
+              "domain.transfer_out.status_change"
+            ],
+            "description": "The name of the subscription event."
+          },
+          "domainName": {
+            "type": "string",
+            "description": "The domain whose outbound transfer status changed. For `completed`, the domain has left name.com; for `initiated` and `canceled`, it remains on the losing account.",
+            "example": "example.com"
+          },
+          "status": {
+            "type": "string",
+            "description": "`initiated` (pending out started), `completed` (domain removed), or `canceled` (no longer pending at the registry).",
+            "enum": [
+              "initiated",
+              "completed",
+              "canceled"
+            ],
+            "example": "completed"
+          },
+          "registryClientId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The registry client ID associated with the domain at the time of transfer out, when available. This can help identify the gaining registrar at the registry.\n",
+            "example": "NAMECOM-123"
+          }
+        }
+      },
+      "ContactVerificationStatusChange": {
+        "type": "object",
+        "required": [
+          "eventName",
+          "domains",
+          "verificationId",
+          "verification"
+        ],
+        "properties": {
+          "eventName": {
+            "type": "string",
+            "enum": [
+              "contact.verification.status_change"
+            ]
+          },
+          "domains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "verificationId": {
+            "description": "The id of the verification record for the contact. Please note, this is different than the `contact_id` that may be returned in other API contexts. This id specifically relates to the verification and will be different than an `contact_id` for the same contact record in other contexts.",
+            "type": "integer",
+            "format": "int64",
+            "example": 4897668
+          },
+          "verification": {
+            "discriminator": {
+              "propertyName": "status"
+            },
+            "oneOf": [
+              {
+                "type": "object",
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "verified"
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "status",
+                  "verifyBy"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "unverified"
+                    ]
+                  },
+                  "verifyBy": {
+                    "description": "The date when the contact should be verified by.",
+                    "type": "string",
+                    "format": "date-time",
+                    "example": "2023-04-01T12:00:00Z"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "DomainTransferInternalInStatusChange": {
+        "type": "object",
+        "required": [
+          "eventName",
+          "sourceAccountId",
+          "destinationAccountId",
+          "status",
+          "occurredAt",
+          "domain"
+        ],
+        "description": "Payload sent when a domain transfers IN to the webhook subscribers account from another name.com account.",
+        "properties": {
+          "eventName": {
+            "type": "string",
+            "enum": [
+              "domain.transfer.internal_in"
+            ],
+            "description": "The name of the subscription event."
+          },
+          "sourceAccountId": {
+            "description": "The account id that previously owned the domain.",
+            "format": "int32",
+            "type": "integer",
+            "example": 12345
+          },
+          "destinationAccountId": {
+            "description": "The account id that now owns the domain.",
+            "format": "int32",
+            "type": "integer",
+            "example": 12345
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed"
+            ]
+          },
+          "occurredAt": {
+            "description": "When the domain transfer in occurred.",
+            "type": "string",
+            "format": "date-time",
+            "example": "2023-04-01T12:00:00Z"
+          },
+          "domain": {
+            "$ref": "#/components/schemas/DomainResponsePayload"
+          }
+        }
+      },
+      "DomainTransferInternalOutStatusChange": {
+        "type": "object",
+        "required": [
+          "eventName",
+          "sourceAccountId",
+          "destinationAccountId",
+          "status",
+          "occurredAt",
+          "domain"
+        ],
+        "description": "Payload sent when a domain transfers OUT from the webhook subscriber's account to another name.com account.",
+        "properties": {
+          "eventName": {
+            "type": "string",
+            "enum": [
+              "domain.transfer.internal_out"
+            ],
+            "description": "The name of the subscription event."
+          },
+          "transferId": {
+            "description": "The internal transfer ID for this move, when available. Omitted when no transfer ID has been assigned for the event.",
+            "format": "int32",
+            "type": "integer",
+            "example": 67890
+          },
+          "sourceAccountId": {
+            "description": "The account id that previously owned the domain (the losing account).",
+            "format": "int32",
+            "type": "integer",
+            "example": 12345
+          },
+          "destinationAccountId": {
+            "description": "The account id that now owns the domain (the gaining account).",
+            "format": "int32",
+            "type": "integer",
+            "example": 54321
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed"
+            ]
+          },
+          "occurredAt": {
+            "description": "When the domain transfer out occurred.",
+            "type": "string",
+            "format": "date-time",
+            "example": "2023-04-01T12:00:00Z"
+          },
+          "domain": {
+            "$ref": "#/components/schemas/DomainResponsePayload"
+          }
+        }
+      },
+      "DomainRegistryRejection": {
+        "type": "object",
+        "required": [
+          "eventName",
+          "domainName",
+          "occurredAt",
+          "orderId",
+          "orderItemId"
+        ],
+        "description": "Payload sent when a domain create request fails after asynchronous registry processing. Most domain creates succeed immediately; this event covers the case where the registry initially accepts processing but later rejects or fails the registration.",
+        "properties": {
+          "eventName": {
+            "type": "string",
+            "enum": [
+              "domain.registry.rejection"
+            ],
+            "description": "The name of the subscription event."
+          },
+          "domainName": {
+            "type": "string",
+            "description": "The domain name that failed to register.",
+            "example": "example.com"
+          },
+          "orderId": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The unique identifier of the order for the failed domain create. Use the List Orders endpoint to retrieve order details.",
+            "example": 123456
+          },
+          "orderItemId": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The unique identifier of the order line item for the failed domain create. Use the List Orders endpoint to retrieve order item details.",
+            "example": 987654
+          },
+          "occurredAt": {
+            "description": "When the asynchronous registration failure was recorded.",
+            "type": "string",
+            "format": "date-time",
+            "example": "2023-04-01T12:00:00Z"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Optional human-readable or registry-provided detail about the failure, when available.",
+            "example": "Registry policy violation"
+          }
+        }
+      },
+      "DomainExpiration": {
+        "type": "object",
+        "required": [
+          "eventName",
+          "domainName",
+          "expirationDate"
+        ],
+        "description": "Payload sent when a domain in the subscribing account expires and the grace period starts. This event is informational; it is separate from lock, removal, and transfer-out events.",
+        "properties": {
+          "eventName": {
+            "type": "string",
+            "enum": [
+              "domain.expiration"
+            ],
+            "description": "The name of the subscription event."
+          },
+          "domainName": {
+            "type": "string",
+            "description": "The name of the expired domain.",
+            "example": "example.com"
+          },
+          "expirationDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The date and time when the domain expired.",
+            "example": "2026-08-15T00:00:00Z"
+          }
+        }
       }
     }
   }

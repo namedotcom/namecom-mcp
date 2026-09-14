@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
 import path from "path";
+import { VERSION } from "./version.js";
 // Setup environment - try multiple possible .env locations
 const possibleEnvPaths = [
     // For development/testing: from current working directory
@@ -86,5 +87,5 @@ export const BLACKLISTED_TAGS = [
 // Server configuration
 export const SERVER_CONFIG = {
     name: "name.com API",
-    version: "1.0.0"
+    version: VERSION
 };

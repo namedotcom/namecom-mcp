@@ -94,7 +94,32 @@ describe('Real name.com Schema Tests', () => {
         const registrantContact = resolveSchemaRef(contactsSchema.properties!.registrant);
         expect(registrantContact.properties?.firstName).toBeDefined();
         expect(registrantContact.properties?.email).toBeDefined();
-        expect(registrantContact.required).toContain('firstName');
+      } finally {
+        setGlobalSpec(originalSpec);
+      }
+    });
+
+    it('should carry the registrant fields a registration requires', () => {
+      // Which contact fields are mandatory is stated on the request side of the spec, not
+      // the response side: a domain read back from the API is not obliged to carry a full
+      // contact, a registration is. Walking the request chain is what proves the generated
+      // tool can still tell a caller which fields a purchase will not go through without.
+      const createRequestRef: OpenApiSchema = {
+        $ref: '#/components/schemas/CreateDomainRequest'
+      };
+
+      const originalSpec = getGlobalSpec();
+      setGlobalSpec(realSpec);
+
+      try {
+        const createRequest = resolveSchemaRef(createRequestRef);
+        const domain = resolveSchemaRef(createRequest.properties!.domain);
+        const contacts = resolveSchemaRef(domain.properties!.contacts);
+        const registrant = resolveSchemaRef(contacts.properties!.registrant);
+
+        expect(registrant.required).toEqual(
+          expect.arrayContaining(['firstName', 'lastName', 'email', 'phone', 'country'])
+        );
       } finally {
         setGlobalSpec(originalSpec);
       }
