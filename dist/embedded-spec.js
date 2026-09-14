@@ -9,7 +9,7 @@ export const EMBEDDED_SPEC = {
         },
         "description": "RESTful API for managing domains, DNS records, and related services at name.com.  Access via HTTPS at api.name.com (production) or api.dev.name.com (testing).  Supports standard authentication, rate-limited to 20 requests/second.",
         "title": "name.com Core API",
-        "version": "1.33.5",
+        "version": "1.33.6",
         "termsOfService": "https://www.name.com/policies/api-access-agreement"
     },
     "servers": [
@@ -1726,6 +1726,8 @@ export const EMBEDDED_SPEC = {
                         "application/json": {
                             "schema": {
                                 "type": "object",
+                                "description": "Fields for updating a domain. At least one of `autorenewEnabled`, `privacyEnabled`, or `locked` is required. Omit a property to leave it unchanged.",
+                                "minProperties": 1,
                                 "properties": {
                                     "autorenewEnabled": {
                                         "type": "boolean",
@@ -22603,10 +22605,14 @@ export const EMBEDDED_SPEC = {
                 "properties": {
                     "emailTo": {
                         "description": "EmailTo is the entire email address to forward email to.",
-                        "type": "string"
+                        "type": "string",
+                        "minLength": 1
                     }
                 },
-                "type": "object"
+                "type": "object",
+                "required": [
+                    "emailTo"
+                ]
             },
             "Record": {
                 "description": "Record is an individual DNS resource record.",
@@ -22973,8 +22979,9 @@ export const EMBEDDED_SPEC = {
                 }
             },
             "URLForwardingUpdate": {
-                "description": "Fields for updating a URL forwarding entry. Omit a property to leave it unchanged. An empty `host` string is the apex, not \"unchanged\".",
+                "description": "Fields for updating a URL forwarding entry. Omit a property to leave it unchanged. An empty `host` string is the apex, not \"unchanged\". At least one property must be present; an empty body is rejected.",
                 "type": "object",
+                "minProperties": 1,
                 "properties": {
                     "forwardsTo": {
                         "description": "The destination URL to which this hostname will be forwarded.",
@@ -23149,11 +23156,13 @@ export const EMBEDDED_SPEC = {
                         "example": [
                             "192.168.1.10",
                             "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
-                        ],
-                        "minItems": 0
+                        ]
                     }
                 },
-                "type": "object"
+                "type": "object",
+                "required": [
+                    "ips"
+                ]
             },
             "EmptyObject": {
                 "type": "object",
@@ -23343,7 +23352,10 @@ export const EMBEDDED_SPEC = {
                         "$ref": "#/components/schemas/ContactsRequest"
                     }
                 },
-                "type": "object"
+                "type": "object",
+                "required": [
+                    "contacts"
+                ]
             },
             "DomainsSetNameserversBody": {
                 "description": "SetNameserversRequest passes the list of nameservers to set for the SetNameserver function.",
