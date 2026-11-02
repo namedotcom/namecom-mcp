@@ -457,19 +457,27 @@ describe('Tool Generator', () => {
 
       mockLoadOpenApiSpec.mockResolvedValue(mockSpec);
       mockResolveSchemaRef.mockImplementation((schema) => schema);
-      mockCallNameApi.mockResolvedValue({ success: true, domainId: '123' });
+      mockCallNameApi.mockImplementation(async (path: string) => {
+        if (path.includes(':getPricing')) return { purchasePrice: 12.99, renewalPrice: 19.99 };
+        if (path === '/core/v1/accountinfo/balance') return { balance: 100 };
+        return { success: true, domainId: '123' };
+      });
 
       await createToolsFromSpec(mockServer as any);
 
       const domainsToolCall = mockServer.tool.mock.calls.find(call => call[0] === 'ManageDomains');
       const toolFunction = domainsToolCall[2];
+      const args = { operation: 'create', domainName: 'example.com', years: 1 };
 
-      const result = await toolFunction({
-        operation: 'create',
-        domainName: 'example.com',
-        years: 1
-      });
+      // A purchase is previewed first and charges nothing.
+      const preview = await toolFunction(args);
+      expect(preview.content[0].text).toContain('Charge now      $12.99');
+      expect(mockCallNameApi).not.toHaveBeenCalledWith('/core/v1/domains', 'POST', expect.anything());
 
+      const token = /confirmationToken: (\S+)/.exec(preview.content[0].text)?.[1];
+      const result = await toolFunction({ ...args, confirmationToken: token });
+
+      // The token is this server's own argument and never reaches the API.
       expect(mockCallNameApi).toHaveBeenCalledWith(
         '/core/v1/domains',
         'POST',
