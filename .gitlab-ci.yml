@@ -55,7 +55,8 @@ security_audit:
   tags:
     - docker_runner-build
   script:
-    - npm audit --audit-level=moderate
+    - npm audit --omit=dev --audit-level=moderate
+    - npm audit --audit-level=high
   allow_failure: false
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
