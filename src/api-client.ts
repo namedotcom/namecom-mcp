@@ -28,13 +28,17 @@ function logToFile(message: string) {
 export async function callNameApi(
   apiPath: string, 
   method: string = "GET", 
-  body: any = null
+  body: any = null,
+  extraHeaders: Record<string, string> = {}
 ): Promise<NameApiResponse> {
   const credentials = Buffer.from(`${NAME_USERNAME}:${NAME_TOKEN}`).toString('base64');
   
   const options: FetchOptions = {
     method,
     headers: {
+      // The operation's own headers, such as X-Idempotency-Key, go first so none of them
+      // can replace the credentials below.
+      ...extraHeaders,
       'Authorization': `Basic ${credentials}`,
       'Content-Type': 'application/json',
       'User-Agent': `namecom-mcp/${VERSION}`

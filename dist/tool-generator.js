@@ -588,6 +588,7 @@ async function executeOperation(op, params, parameterTypes, originalPathMap) {
         let apiPath = op.path;
         const pathParams = {};
         const queryParams = {};
+        const headerParams = {};
         const bodyParams = {};
         // Categorize parameters
         if (op.operation.parameters) {
@@ -599,12 +600,15 @@ async function executeOperation(op, params, parameterTypes, originalPathMap) {
                     else if (param.in === 'query') {
                         queryParams[param.name] = params[param.name];
                     }
+                    else if (param.in === 'header') {
+                        headerParams[param.name] = String(params[param.name]);
+                    }
                 }
             }
         }
         // Handle body parameters
         for (const [key, value] of Object.entries(params)) {
-            if (value !== undefined && !pathParams[key] && !queryParams[key]) {
+            if (value !== undefined && !pathParams[key] && !queryParams[key] && !(key in headerParams)) {
                 let processedValue = value;
                 // Special handling for array and object string inputs
                 if (typeof value === 'string' && value.trim()) {
@@ -665,7 +669,9 @@ async function executeOperation(op, params, parameterTypes, originalPathMap) {
                 requestBody = filteredBodyParams;
             }
         }
-        const result = await callNameApi(apiPath, op.method.toUpperCase(), requestBody);
+        const result = Object.keys(headerParams).length > 0
+            ? await callNameApi(apiPath, op.method.toUpperCase(), requestBody, headerParams)
+            : await callNameApi(apiPath, op.method.toUpperCase(), requestBody);
         // A 204 carries no body, and `JSON.stringify(undefined)` returns undefined rather
         // than a string. Rendering it puts a non-string where the MCP content schema requires
         // text, so a successful delete arrives at the client as a malformed result.

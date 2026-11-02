@@ -719,6 +719,7 @@ async function executeOperation(
     let apiPath = op.path;
     const pathParams: Record<string, any> = {};
     const queryParams: Record<string, any> = {};
+    const headerParams: Record<string, string> = {};
     const bodyParams: Record<string, any> = {};
     
     // Categorize parameters
@@ -729,6 +730,8 @@ async function executeOperation(
             pathParams[param.name] = params[param.name];
           } else if (param.in === 'query') {
             queryParams[param.name] = params[param.name];
+          } else if (param.in === 'header') {
+            headerParams[param.name] = String(params[param.name]);
           }
         }
       }
@@ -736,7 +739,7 @@ async function executeOperation(
     
     // Handle body parameters
     for (const [key, value] of Object.entries(params)) {
-      if (value !== undefined && !pathParams[key] && !queryParams[key]) {
+      if (value !== undefined && !pathParams[key] && !queryParams[key] && !(key in headerParams)) {
         let processedValue = value;
         
         // Special handling for array and object string inputs
@@ -804,7 +807,9 @@ async function executeOperation(
       }
     }
     
-    const result = await callNameApi(apiPath, op.method.toUpperCase(), requestBody);
+    const result = Object.keys(headerParams).length > 0
+      ? await callNameApi(apiPath, op.method.toUpperCase(), requestBody, headerParams)
+      : await callNameApi(apiPath, op.method.toUpperCase(), requestBody);
     
     // A 204 carries no body, and `JSON.stringify(undefined)` returns undefined rather
     // than a string. Rendering it puts a non-string where the MCP content schema requires
