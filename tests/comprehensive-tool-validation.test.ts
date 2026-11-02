@@ -1,3 +1,4 @@
+import type { MockedFunction } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { load } from 'js-yaml';
@@ -7,17 +8,22 @@ import { callNameApi } from '../src/api-client.js';
 import { OpenApiSpec } from '../src/types.js';
 
 // Mock the API client
-jest.mock('../src/api-client.js', () => ({
-  callNameApi: jest.fn()
+vi.mock('../src/api-client.js', () => ({
+  callNameApi: vi.fn()
 }));
 
-jest.mock('../src/config.js', () => ({
+// Nothing is excluded and there are no query defaults. Vitest refuses a mock that lacks an
+// export the code reads, so they are stated rather than left undefined.
+vi.mock('../src/config.js', () => ({
   NAME_USERNAME: 'test-username',
   NAME_TOKEN: 'test-token',
-  NAME_API_URL: 'https://mcp.dev.name.com'
+  NAME_API_URL: 'https://mcp.dev.name.com',
+  DEFAULT_VALUES: {},
+  BLACKLISTED_OPERATIONS: [],
+  BLACKLISTED_TAGS: []
 }));
 
-const mockCallNameApi = callNameApi as jest.MockedFunction<typeof callNameApi>;
+const mockCallNameApi = callNameApi as MockedFunction<typeof callNameApi>;
 
 describe('Comprehensive Tool Validation', () => {
   let realSpec: OpenApiSpec;
@@ -44,11 +50,11 @@ describe('Comprehensive Tool Validation', () => {
   beforeAll(async () => {
     // Setup mock server that captures all tool registrations
     mockServer = {
-      tool: jest.fn((name, parameters, toolFunction) => {
+      tool: vi.fn((name, parameters, toolFunction) => {
         generatedTools.push({ name, parameters, toolFunction });
       }),
-      listTools: jest.fn(),
-      callTool: jest.fn()
+      listTools: vi.fn(),
+      callTool: vi.fn()
     };
 
     // Load the actual name.com OpenAPI spec
@@ -85,7 +91,7 @@ describe('Comprehensive Tool Validation', () => {
   });
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockCallNameApi.mockReset();
   });
 

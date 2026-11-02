@@ -1,4 +1,4 @@
-import { jest } from '@jest/globals';
+import { vi } from 'vitest';
 
 describe('Config URL Validation', () => {
   const originalEnv = process.env;
@@ -6,14 +6,14 @@ describe('Config URL Validation', () => {
   const originalStderrWrite = process.stderr.write;
 
   beforeEach(() => {
-    jest.resetModules();
+    vi.resetModules();
     process.env = { ...originalEnv };
     
     // Mock process.exit to prevent tests from actually exiting
-    process.exit = jest.fn() as never;
+    process.exit = vi.fn() as never;
     
     // Mock stderr.write to capture error messages
-    process.stderr.write = jest.fn().mockReturnValue(true) as any;
+    process.stderr.write = vi.fn().mockReturnValue(true) as any;
   });
 
   afterEach(() => {

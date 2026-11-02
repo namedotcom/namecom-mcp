@@ -29,7 +29,7 @@ test:
     - docker_runner-build
   parallel:
     matrix:
-      - NODE_VERSION: ["20", "22"]
+      - NODE_VERSION: ["22", "24", "26"]
   script:
     - npm run lint --if-present
     - npm run build
@@ -49,14 +49,13 @@ test:
 
 # Security audit job
 security_audit:
-  image: node:20
+  image: node:24
   <<: *node_cache
   stage: security
   tags:
     - docker_runner-build
   script:
-    - npm audit --omit=dev --audit-level=moderate
-    - npm audit --audit-level=high
+    - npm audit --audit-level=moderate
   allow_failure: false
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -65,7 +64,7 @@ security_audit:
 # Sync to GitHub and create release (triggers NPM publishing)
 sync_to_github:
   stage: deploy
-  image: node:20
+  image: node:24
   tags:
     - docker_runner-build
   variables:
