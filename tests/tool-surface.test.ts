@@ -19,8 +19,8 @@ import { createToolsFromSpec } from '../src/tool-generator.js';
  * those mocked away would not be the surface users get.
  */
 
-jest.mock('../src/api-client.js', () => ({
-  callNameApi: jest.fn()
+vi.mock('../src/api-client.js', () => ({
+  callNameApi: vi.fn()
 }));
 
 interface ExpectedSurface {

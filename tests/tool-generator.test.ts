@@ -1,18 +1,24 @@
+import type { MockedFunction } from 'vitest';
 // Mock the dependencies
-jest.mock('../src/openapi-utils.js', () => ({
-  loadOpenApiSpec: jest.fn(),
-  openApiSchemaToZod: jest.fn(),
-  resolveSchemaRef: jest.fn()
+vi.mock('../src/openapi-utils.js', () => ({
+  loadOpenApiSpec: vi.fn(),
+  openApiSchemaToZod: vi.fn(),
+  resolveSchemaRef: vi.fn()
 }));
 
-jest.mock('../src/api-client.js', () => ({
-  callNameApi: jest.fn()
+vi.mock('../src/api-client.js', () => ({
+  callNameApi: vi.fn()
 }));
 
-jest.mock('../src/config.js', () => ({
+// Nothing is excluded and there are no query defaults. Vitest refuses a mock that lacks an
+// export the code reads, so they are stated rather than left undefined.
+vi.mock('../src/config.js', () => ({
   NAME_USERNAME: 'test-username',
   NAME_TOKEN: 'test-token',
-  NAME_API_URL: 'https://mcp.dev.name.com'
+  NAME_API_URL: 'https://mcp.dev.name.com',
+  DEFAULT_VALUES: {},
+  BLACKLISTED_OPERATIONS: [],
+  BLACKLISTED_TAGS: []
 }));
 
 import { createToolsFromSpec, createFallbackTools, flattenObjectProperties } from '../src/tool-generator.js';
@@ -20,19 +26,19 @@ import { loadOpenApiSpec, openApiSchemaToZod, resolveSchemaRef } from '../src/op
 import { callNameApi } from '../src/api-client.js';
 import { z } from 'zod';
 
-const mockLoadOpenApiSpec = loadOpenApiSpec as jest.MockedFunction<typeof loadOpenApiSpec>;
-const mockOpenApiSchemaToZod = openApiSchemaToZod as jest.MockedFunction<typeof openApiSchemaToZod>;
-const mockResolveSchemaRef = resolveSchemaRef as jest.MockedFunction<typeof resolveSchemaRef>;
-const mockCallNameApi = callNameApi as jest.MockedFunction<typeof callNameApi>;
+const mockLoadOpenApiSpec = loadOpenApiSpec as MockedFunction<typeof loadOpenApiSpec>;
+const mockOpenApiSchemaToZod = openApiSchemaToZod as MockedFunction<typeof openApiSchemaToZod>;
+const mockResolveSchemaRef = resolveSchemaRef as MockedFunction<typeof resolveSchemaRef>;
+const mockCallNameApi = callNameApi as MockedFunction<typeof callNameApi>;
 
 // Mock MCP Server
 const mockServer = {
-  tool: jest.fn()
+  tool: vi.fn()
 };
 
 describe('Tool Generator', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockCallNameApi.mockClear();
     
     // Set up default mock behavior for resolveSchemaRef

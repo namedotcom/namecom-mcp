@@ -1,5 +1,5 @@
 // Mock the config module to test its exports
-jest.mock('../src/config.js', () => ({
+vi.mock('../src/config.js', () => ({
   NAME_USERNAME: 'test-username',
   NAME_TOKEN: 'test-token', 
   NAME_API_URL: 'https://mcp.dev.name.com',

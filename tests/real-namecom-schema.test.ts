@@ -7,14 +7,19 @@ import { OpenApiSpec, OpenApiSchema } from '../src/types';
 import { z } from 'zod';
 
 // Mock the API client
-jest.mock('../src/api-client.js', () => ({
-  callNameApi: jest.fn()
+vi.mock('../src/api-client.js', () => ({
+  callNameApi: vi.fn()
 }));
 
-jest.mock('../src/config.js', () => ({
+// Nothing is excluded and there are no query defaults. Vitest refuses a mock that lacks an
+// export the code reads, so they are stated rather than left undefined.
+vi.mock('../src/config.js', () => ({
   NAME_USERNAME: 'test-username',
   NAME_TOKEN: 'test-token',
-  NAME_API_URL: 'https://mcp.dev.name.com'
+  NAME_API_URL: 'https://mcp.dev.name.com',
+  DEFAULT_VALUES: {},
+  BLACKLISTED_OPERATIONS: [],
+  BLACKLISTED_TAGS: []
 }));
 
 describe('Real name.com Schema Tests', () => {
@@ -24,9 +29,9 @@ describe('Real name.com Schema Tests', () => {
   beforeAll(async () => {
     // Setup mock server
     mockServer = {
-      tool: jest.fn(),
-      listTools: jest.fn(),
-      callTool: jest.fn()
+      tool: vi.fn(),
+      listTools: vi.fn(),
+      callTool: vi.fn()
     };
 
     // Load the actual name.com OpenAPI spec
@@ -40,7 +45,7 @@ describe('Real name.com Schema Tests', () => {
   });
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('Schema Resolution with Real OpenAPI Spec', () => {
@@ -165,9 +170,9 @@ describe('Real name.com Schema Tests', () => {
   describe('Schema Flattening for MCP Tool Generation', () => {
     it('should correctly flatten the CreateDomainRequest schema with nested Domain and Contacts', async () => {
       // Mock loadOpenApiSpec to return our real spec  
-      jest.doMock('../src/openapi-utils.js', () => ({
-        ...jest.requireActual('../src/openapi-utils.js'),
-        loadOpenApiSpec: jest.fn().mockResolvedValue(realSpec)
+      vi.doMock('../src/openapi-utils.js', async () => ({
+        ...(await vi.importActual('../src/openapi-utils.js')),
+        loadOpenApiSpec: vi.fn().mockResolvedValue(realSpec)
       }));
 
       const result = await createToolsFromSpec(mockServer);
@@ -227,9 +232,9 @@ describe('Real name.com Schema Tests', () => {
     });
 
     it('should handle array properties correctly in flattening', async () => {
-      jest.doMock('../src/openapi-utils.js', () => ({
-        ...jest.requireActual('../src/openapi-utils.js'),
-        loadOpenApiSpec: jest.fn().mockResolvedValue(realSpec)
+      vi.doMock('../src/openapi-utils.js', async () => ({
+        ...(await vi.importActual('../src/openapi-utils.js')),
+        loadOpenApiSpec: vi.fn().mockResolvedValue(realSpec)
       }));
 
       await createToolsFromSpec(mockServer);
@@ -258,9 +263,9 @@ describe('Real name.com Schema Tests', () => {
     });
 
     it('should preserve required field information during flattening', async () => {
-      jest.doMock('../src/openapi-utils.js', () => ({
-        ...jest.requireActual('../src/openapi-utils.js'),
-        loadOpenApiSpec: jest.fn().mockResolvedValue(realSpec)
+      vi.doMock('../src/openapi-utils.js', async () => ({
+        ...(await vi.importActual('../src/openapi-utils.js')),
+        loadOpenApiSpec: vi.fn().mockResolvedValue(realSpec)
       }));
 
       await createToolsFromSpec(mockServer);
@@ -295,9 +300,9 @@ describe('Real name.com Schema Tests', () => {
   describe('Tool Generation with Real Schema', () => {
     it('should create tools from real spec without errors', async () => {
       // Mock loadOpenApiSpec to return our real spec
-      jest.doMock('../src/openapi-utils.js', () => ({
-        ...jest.requireActual('../src/openapi-utils.js'),
-        loadOpenApiSpec: jest.fn().mockResolvedValue(realSpec)
+      vi.doMock('../src/openapi-utils.js', async () => ({
+        ...(await vi.importActual('../src/openapi-utils.js')),
+        loadOpenApiSpec: vi.fn().mockResolvedValue(realSpec)
       }));
 
       const result = await createToolsFromSpec(mockServer);
@@ -306,9 +311,9 @@ describe('Real name.com Schema Tests', () => {
     });
 
     it('should properly flatten CreateDomain parameters', async () => {
-      jest.doMock('../src/openapi-utils.js', () => ({
-        ...jest.requireActual('../src/openapi-utils.js'),
-        loadOpenApiSpec: jest.fn().mockResolvedValue(realSpec)
+      vi.doMock('../src/openapi-utils.js', async () => ({
+        ...(await vi.importActual('../src/openapi-utils.js')),
+        loadOpenApiSpec: vi.fn().mockResolvedValue(realSpec)
       }));
 
       await createToolsFromSpec(mockServer);
@@ -355,9 +360,9 @@ describe('Real name.com Schema Tests', () => {
 
   describe('Complex Schema Scenarios', () => {
     it('should handle EmailForwarding endpoints', async () => {
-      jest.doMock('../src/openapi-utils.js', () => ({
-        ...jest.requireActual('../src/openapi-utils.js'),
-        loadOpenApiSpec: jest.fn().mockResolvedValue(realSpec)
+      vi.doMock('../src/openapi-utils.js', async () => ({
+        ...(await vi.importActual('../src/openapi-utils.js')),
+        loadOpenApiSpec: vi.fn().mockResolvedValue(realSpec)
       }));
 
       await createToolsFromSpec(mockServer);
@@ -370,9 +375,9 @@ describe('Real name.com Schema Tests', () => {
     });
 
     it('should handle URLForwarding with nested schemas', async () => {
-      jest.doMock('../src/openapi-utils.js', () => ({
-        ...jest.requireActual('../src/openapi-utils.js'),
-        loadOpenApiSpec: jest.fn().mockResolvedValue(realSpec)
+      vi.doMock('../src/openapi-utils.js', async () => ({
+        ...(await vi.importActual('../src/openapi-utils.js')),
+        loadOpenApiSpec: vi.fn().mockResolvedValue(realSpec)
       }));
 
       await createToolsFromSpec(mockServer);
@@ -391,25 +396,23 @@ describe('Real name.com Schema Tests', () => {
         $ref: '#/components/schemas/NonExistentSchema'
       };
 
-      const utils = require('../src/openapi-utils.js');
-      const originalSpec = utils.globalSpec;
-      utils.globalSpec = realSpec;
+      const originalSpec = getGlobalSpec();
+      setGlobalSpec(realSpec);
 
       try {
         const resolved = resolveSchemaRef(invalidRef);
         // Should return the original schema when reference cannot be resolved
         expect(resolved).toEqual(invalidRef);
       } finally {
-        utils.globalSpec = originalSpec;
+        setGlobalSpec(originalSpec);
       }
     });
 
     it('should handle circular references without infinite loops', () => {
       // This is more of a defensive test - the real name.com spec shouldn't have circular refs
       // but our resolver should handle them gracefully
-      const utils = require('../src/openapi-utils.js');
-      const originalSpec = utils.globalSpec;
-      utils.globalSpec = realSpec;
+      const originalSpec = getGlobalSpec();
+      setGlobalSpec(realSpec);
 
       try {
         // Try resolving a complex schema that could potentially have circular refs
@@ -419,7 +422,7 @@ describe('Real name.com Schema Tests', () => {
         expect(resolved).toBeDefined();
         expect(resolved.type).toBe('object');
       } finally {
-        utils.globalSpec = originalSpec;
+        setGlobalSpec(originalSpec);
       }
     });
   });
