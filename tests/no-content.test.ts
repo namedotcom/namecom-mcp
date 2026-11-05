@@ -1,3 +1,4 @@
+import type { MockedFunction } from 'vitest';
 import { createToolsFromSpec } from '../src/tool-generator.js';
 import { callNameApi } from '../src/api-client.js';
 
@@ -8,11 +9,11 @@ import { callNameApi } from '../src/api-client.js';
  * only asserts the call was made, so it is asserted on the text itself.
  */
 
-jest.mock('../src/api-client.js', () => ({
-  callNameApi: jest.fn()
+vi.mock('../src/api-client.js', () => ({
+  callNameApi: vi.fn()
 }));
 
-const mockCallNameApi = callNameApi as jest.MockedFunction<typeof callNameApi>;
+const mockCallNameApi = callNameApi as MockedFunction<typeof callNameApi>;
 
 describe('operations that return no content', () => {
   let handlers: Record<string, Function>;
