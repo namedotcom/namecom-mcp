@@ -1,3 +1,4 @@
+import type { MockedFunction } from 'vitest';
 import { createToolsFromSpec } from '../src/tool-generator.js';
 import { resetPendingConfirmations } from '../src/purchase-gate.js';
 
@@ -6,13 +7,13 @@ import { resetPendingConfirmations } from '../src/purchase-gate.js';
  * The API client is mocked; config is not, as in tool-surface.test.ts.
  */
 
-jest.mock('../src/api-client.js', () => ({
-  callNameApi: jest.fn()
+vi.mock('../src/api-client.js', () => ({
+  callNameApi: vi.fn()
 }));
 
 import { callNameApi } from '../src/api-client.js';
 
-const mockCallNameApi = callNameApi as jest.MockedFunction<typeof callNameApi>;
+const mockCallNameApi = callNameApi as MockedFunction<typeof callNameApi>;
 
 type Registered = { parameters: Record<string, any>; handler: (args: Record<string, any>) => Promise<any> };
 const tools: Record<string, Registered> = {};
@@ -27,7 +28,7 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
   resetPendingConfirmations();
   mockCallNameApi.mockImplementation(async (path: string) => {
     if (path.includes(':getPricing')) return { purchasePrice: 17.99, renewalPrice: 19.99 };
