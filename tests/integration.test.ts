@@ -1,11 +1,11 @@
 // Mock undici fetch before importing any modules
-const mockFetchGlobal = jest.fn();
-jest.mock('undici', () => ({
+const { mockFetchGlobal } = vi.hoisted(() => ({ mockFetchGlobal: vi.fn() }));
+vi.mock('undici', () => ({
   fetch: mockFetchGlobal
 }));
 
 // Mock config
-jest.mock('../src/config.js', () => ({
+vi.mock('../src/config.js', () => ({
   NAME_USERNAME: 'test-username',
   NAME_TOKEN: 'test-token',
   NAME_API_URL: 'https://mcp.dev.name.com'
@@ -15,7 +15,7 @@ import { callNameApi } from '../src/api-client.js';
 
 describe('name.com API Integration Tests', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockFetchGlobal.mockClear();
   });
 

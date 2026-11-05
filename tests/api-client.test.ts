@@ -1,13 +1,13 @@
 // Mock the config module to avoid import.meta issues
-jest.mock('../src/config.js', () => ({
+vi.mock('../src/config.js', () => ({
   NAME_USERNAME: 'test-username',
   NAME_TOKEN: 'test-token',
   NAME_API_URL: 'https://mcp.dev.name.com'
 }));
 
 // Mock undici fetch before importing any modules
-const mockFetch = jest.fn();
-jest.mock('undici', () => ({
+const { mockFetch } = vi.hoisted(() => ({ mockFetch: vi.fn() }));
+vi.mock('undici', () => ({
   fetch: mockFetch
 }));
 
@@ -15,7 +15,7 @@ import { callNameApi } from '../src/api-client.js';
 
 describe('API Client', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockFetch.mockClear();
   });
 

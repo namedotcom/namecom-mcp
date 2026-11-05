@@ -1,11 +1,12 @@
-jest.mock('../src/api-client.js', () => ({
-  callNameApi: jest.fn()
+import type { MockedFunction } from 'vitest';
+vi.mock('../src/api-client.js', () => ({
+  callNameApi: vi.fn()
 }));
 
 import { callNameApi } from '../src/api-client.js';
 import { gatePurchase, resetPendingConfirmations, TOKEN_TTL_MS } from '../src/purchase-gate.js';
 
-const mockCallNameApi = callNameApi as jest.MockedFunction<typeof callNameApi>;
+const mockCallNameApi = callNameApi as MockedFunction<typeof callNameApi>;
 
 const REGISTER = { domain_domainName: 'new.com', years: 1 };
 const RENEW = { domainName: 'held.com', years: 1 };
@@ -13,7 +14,7 @@ const RENEW = { domainName: 'held.com', years: 1 };
 let pricing: Record<string, unknown>;
 
 beforeEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
   resetPendingConfirmations();
   pricing = { premium: false, purchasePrice: 17.99, renewalPrice: 19.99, transferPrice: 17.99 };
   mockCallNameApi.mockImplementation(async (path: string) => {
