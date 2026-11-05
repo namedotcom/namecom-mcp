@@ -193,6 +193,24 @@ describe('API Client', () => {
       expect(result).toBeUndefined();
     });
 
+    it('adds operation headers without letting them replace the credentials', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({}),
+        headers: new Map([['content-type', 'application/json']])
+      });
+
+      await callNameApi('/core/v1/domains', 'POST', {}, {
+        'X-Idempotency-Key': 'key-123',
+        'Authorization': 'Bearer not-the-caller'
+      });
+
+      const headers = mockFetch.mock.calls[0][1].headers;
+      expect(headers['X-Idempotency-Key']).toBe('key-123');
+      expect(headers['Authorization']).toMatch(/^Basic /);
+    });
+
     it('should include User-Agent header with version number', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,

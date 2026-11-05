@@ -22,11 +22,14 @@ function logToFile(message) {
 /**
  * Helper function to make authenticated requests to name.com API
  */
-export async function callNameApi(apiPath, method = "GET", body = null) {
+export async function callNameApi(apiPath, method = "GET", body = null, extraHeaders = {}) {
     const credentials = Buffer.from(`${NAME_USERNAME}:${NAME_TOKEN}`).toString('base64');
     const options = {
         method,
         headers: {
+            // The operation's own headers, such as X-Idempotency-Key, go first so none of them
+            // can replace the credentials below.
+            ...extraHeaders,
             'Authorization': `Basic ${credentials}`,
             'Content-Type': 'application/json',
             'User-Agent': `namecom-mcp/${VERSION}`

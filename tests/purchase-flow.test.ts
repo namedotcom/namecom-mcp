@@ -71,6 +71,22 @@ describe('registering a domain', () => {
   });
 });
 
+describe('an idempotency key', () => {
+  it('reaches the API as a header, not in the body', async () => {
+    const args = { operation: 'create', domain_domainName: 'new.com', years: 1, 'X-Idempotency-Key': 'key-123' };
+    const preview = await tools.ManageDomains.handler(args);
+    const token = /confirmationToken: (\S+)/.exec(textOf(preview))?.[1];
+
+    await tools.ManageDomains.handler({ ...args, confirmationToken: token });
+    expect(mockCallNameApi).toHaveBeenCalledWith(
+      '/core/v1/domains',
+      'POST',
+      { domain: { domainName: 'new.com' }, years: 1 },
+      { 'X-Idempotency-Key': 'key-123' }
+    );
+  });
+});
+
 describe('the confirmation token argument', () => {
   it('is offered by every tool with an operation that charges or refunds', () => {
     expect(tools.ManageDomains.parameters['confirmationToken']).toBeDefined();
