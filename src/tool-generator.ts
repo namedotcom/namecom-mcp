@@ -5,6 +5,7 @@ import { loadOpenApiSpec, openApiSchemaToZod, resolveSchemaRef } from "./openapi
 import { callNameApi } from "./api-client.js";
 import { DEFAULT_VALUES, BLACKLISTED_OPERATIONS, BLACKLISTED_TAGS } from "./config.js";
 import { assignOperationNames } from "./operation-keys.js";
+import { CONFIRMATION_ARG, gatePurchase, isGatedOperation } from "./purchase-gate.js";
 
 /**
  * Helper functions to create the help and support tools
@@ -86,14 +87,22 @@ export function flattenObjectProperties(
   prefix: string, 
   requiredFields: string[],
   parameterTypes: Record<string, 'array' | 'object' | 'simple'> = {},
-  originalPathMap: Record<string, string> = {}
+  originalPathMap: Record<string, string> = {},
+  requiredIfSent?: string
 ): void {
   if (!schema.properties) return;
   
   for (const [propName, propSchema] of Object.entries(schema.properties)) {
     const fullPropName = prefix ? `${prefix}.${propName}` : propName;
     const sanitizedPropName = sanitizeParameterName(fullPropName);
-    const isPropRequired = requiredFields.includes(propName);
+    // A field its parent requires is required for the call only when every object above it
+    // is required too. Inside an optional object, such as a contact, it is required only
+    // once something in that object is sent, and is described that way.
+    const requiredByParent = requiredFields.includes(propName);
+    const isPropRequired = requiredByParent && requiredIfSent === undefined;
+    const condition = requiredByParent && requiredIfSent !== undefined
+      ? ` (required if you send any ${sanitizeParameterName(requiredIfSent)}_* parameter)`
+      : '';
     const resolvedPropSchema = resolveSchemaRef(propSchema as any);
     
     // Store mapping from sanitized name back to original dot notation
@@ -107,11 +116,12 @@ export function flattenObjectProperties(
         fullPropName, 
         resolvedPropSchema.required || [],
         parameterTypes,
-        originalPathMap
+        originalPathMap,
+        requiredByParent ? requiredIfSent : fullPropName
       );
     } else if (resolvedPropSchema.type === 'object' && resolvedPropSchema.additionalProperties) {
       // Handle objects with additionalProperties (like tldRequirements)
-      const description = `${isPropRequired ? 'REQUIRED' : 'OPTIONAL'} - ${resolvedPropSchema.description?.split('.')[0] || 'Key-value object'}`;
+      const description = `${isPropRequired ? 'REQUIRED' : 'OPTIONAL'} - ${resolvedPropSchema.description?.split('.')[0] || 'Key-value object'}${condition}`;
       params[sanitizedPropName] = z.string().optional()
         .describe(description);
       parameterTypes[sanitizedPropName] = 'object';
@@ -119,12 +129,12 @@ export function flattenObjectProperties(
       const itemSchema = resolveSchemaRef(resolvedPropSchema.items);
       
       if (itemSchema.type === 'object' && itemSchema.properties) {
-        const description = `${isPropRequired ? 'REQUIRED' : 'OPTIONAL'} - ${resolvedPropSchema.description?.split('.')[0] || 'Array of objects'}`;
+        const description = `${isPropRequired ? 'REQUIRED' : 'OPTIONAL'} - ${resolvedPropSchema.description?.split('.')[0] || 'Array of objects'}${condition}`;
         params[sanitizedPropName] = openApiSchemaToZod(resolvedPropSchema, isPropRequired)
           .describe(description);
         parameterTypes[sanitizedPropName] = 'array';
       } else {
-        const description = `${isPropRequired ? 'REQUIRED' : 'OPTIONAL'} - ${resolvedPropSchema.description?.split('.')[0] || `Array of ${itemSchema.type || 'values'}`}`;
+        const description = `${isPropRequired ? 'REQUIRED' : 'OPTIONAL'} - ${resolvedPropSchema.description?.split('.')[0] || `Array of ${itemSchema.type || 'values'}`}${condition}`;
         params[sanitizedPropName] = z.string().optional()
           .describe(description);
         parameterTypes[sanitizedPropName] = 'array';
@@ -140,7 +150,7 @@ export function flattenObjectProperties(
         baseDescription = 'Required ONLY for premium domains (where domain search/check shows premium: true). For standard domains (premium: false): ALWAYS OMIT this parameter - registration will auto-calculate total cost (including multi-year), renewal will use standard pricing, and transfer will use standard pricing';
       }
       
-      let description = `${isPropRequired ? 'REQUIRED' : 'OPTIONAL'} - ${baseDescription}`;
+      let description = `${isPropRequired ? 'REQUIRED' : 'OPTIONAL'} - ${baseDescription}${condition}`;
       
       // Add example if present
       if (resolvedPropSchema.example) {
@@ -414,7 +424,7 @@ function createOperationDescriptions(
       } else if (op.operationId === 'CheckAvailability') {
         guidance += ' Use ONLY for validating specific domains: checks exact domain availability. Use only when user asks about specific domains.';
       } else if (opType === 'create') {
-        guidance += ' Creates a new domain. Use only when user asks to create. If contact info from other domains exists, use it. Otherwise, get and confirm contact info from user before purchasing; do not autofill fake contact information.';
+        guidance += " Creates a new domain. Use only when user asks to create. If the user gives no contact details, leave the contact parameters out: the account's default contacts are used. Never invent contact details or copy them from another domain.";
       }
     }
 
@@ -577,6 +587,16 @@ async function createConsolidatedTool(server: McpServer, tag: string, operations
     }
   }
   
+  // A gated operation charges only on its second call, which carries the token its preview
+  // handed out. The schema has to accept that token, or the confirming call is refused.
+  const gatedOperations = operations.filter(op => isGatedOperation(op.operationId));
+  if (gatedOperations.length > 0) {
+    params[CONFIRMATION_ARG] = confirmationTokenSchema();
+    for (const op of gatedOperations) {
+      operationParams[operationNames.get(op.operationId) as string].optional.add(CONFIRMATION_ARG);
+    }
+  }
+
   // Create the consolidated tool
   server.tool(
     toolName,
@@ -629,8 +649,13 @@ async function createConsolidatedTool(server: McpServer, tag: string, operations
         };
       }
       
+      // A purchase or refund runs only once the user approved its preview.
+      const gate = await gatePurchase(matchingOp.operationId, otherParams);
+      if (gate !== undefined) return gate;
+      const { [CONFIRMATION_ARG]: _token, ...apiParams } = otherParams;
+
       // Execute the operation
-      return await executeOperation(matchingOp, otherParams, allParameterTypes, allOriginalPathMap);
+      return await executeOperation(matchingOp, apiParams, allParameterTypes, allOriginalPathMap);
     }
   );
 }
@@ -694,6 +719,7 @@ async function executeOperation(
     let apiPath = op.path;
     const pathParams: Record<string, any> = {};
     const queryParams: Record<string, any> = {};
+    const headerParams: Record<string, string> = {};
     const bodyParams: Record<string, any> = {};
     
     // Categorize parameters
@@ -704,6 +730,8 @@ async function executeOperation(
             pathParams[param.name] = params[param.name];
           } else if (param.in === 'query') {
             queryParams[param.name] = params[param.name];
+          } else if (param.in === 'header') {
+            headerParams[param.name] = String(params[param.name]);
           }
         }
       }
@@ -711,7 +739,7 @@ async function executeOperation(
     
     // Handle body parameters
     for (const [key, value] of Object.entries(params)) {
-      if (value !== undefined && !pathParams[key] && !queryParams[key]) {
+      if (value !== undefined && !pathParams[key] && !queryParams[key] && !(key in headerParams)) {
         let processedValue = value;
         
         // Special handling for array and object string inputs
@@ -779,7 +807,9 @@ async function executeOperation(
       }
     }
     
-    const result = await callNameApi(apiPath, op.method.toUpperCase(), requestBody);
+    const result = Object.keys(headerParams).length > 0
+      ? await callNameApi(apiPath, op.method.toUpperCase(), requestBody, headerParams)
+      : await callNameApi(apiPath, op.method.toUpperCase(), requestBody);
     
     // A 204 carries no body, and `JSON.stringify(undefined)` returns undefined rather
     // than a string. Rendering it puts a non-string where the MCP content schema requires
@@ -826,13 +856,23 @@ async function executeOperation(
  */
 async function createSingleOperationTool(server: McpServer, op: ConsolidatedOperation): Promise<void> {
   const { params, parameterTypes, originalPathMap } = await extractOperationParameters(op);
+  if (isGatedOperation(op.operationId)) params[CONFIRMATION_ARG] = confirmationTokenSchema();
   
   server.tool(
     op.operationId,
     params,
     async (toolParams: Record<string, any>) => {
-      return await executeOperation(op, toolParams, parameterTypes, originalPathMap);
+      const gate = await gatePurchase(op.operationId, toolParams);
+      if (gate !== undefined) return gate;
+      const { [CONFIRMATION_ARG]: _token, ...apiParams } = toolParams;
+      return await executeOperation(op, apiParams, parameterTypes, originalPathMap);
     }
+  );
+}
+
+function confirmationTokenSchema(): z.ZodTypeAny {
+  return z.string().optional().describe(
+    'OPTIONAL - Token from the preview of this exact call. Omit it: the call returns the price and charges nothing. Send it only after the user approved that preview.'
   );
 }
 
