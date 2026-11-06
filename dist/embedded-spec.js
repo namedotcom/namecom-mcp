@@ -9,7 +9,7 @@ export const EMBEDDED_SPEC = {
         },
         "description": "RESTful API for managing domains, DNS records, and related services at name.com.  Access via HTTPS at api.name.com (production) or api.dev.name.com (testing).  Supports standard authentication, rate-limited to 20 requests/second.",
         "title": "name.com Core API",
-        "version": "1.33.6",
+        "version": "1.36.2",
         "termsOfService": "https://www.name.com/policies/api-access-agreement"
     },
     "servers": [
@@ -1174,6 +1174,13 @@ export const EMBEDDED_SPEC = {
                                         "summary": "Invalid registration term",
                                         "value": {
                                             "message": "Invalid years"
+                                        }
+                                    },
+                                    "promoNoDiscount": {
+                                        "summary": "Promo code applies no discount",
+                                        "description": "Returned when the supplied promo applies no discount. The order is not created. Promo codes specify eligibility criteria, including duration.",
+                                        "value": {
+                                            "message": "Promo code does not apply a discount to this purchase"
                                         }
                                     }
                                 }
@@ -13689,7 +13696,7 @@ export const EMBEDDED_SPEC = {
                 ]
             },
             "post": {
-                "description": "Creates a webhook subscription to receive real-time notifications about specific domain or account events (e.g. transfer completions, renewals). Pass the callback URL and event types. This allows external systems to stay in sync with name.com changes.\nSupported webhook event names:\n- `account.credit.balance_change` – account credit balance changes (increases or decreases).\n- `account.domain.removal` – domain removed from the subscribing account.\n- `domain.lock.status_change` – domain lock added or removed.\n- `domain.transfer.status_change` – domain transfer IN to name.com; status updates while name.com is the gaining registrar.\n- `domain.transfer_out.status_change` – domain transfer OUT from name.com; `initiated`, `completed` (domain removed), or `canceled` (no longer pending at the registry).\n- `domain.transfer.internal_in` - name.com domain transfers in to the subscribing account via internal transfer.\n- `domain.transfer.internal_out` - name.com domain transfers out of the subscribing account via internal transfer.\n- `contact.verification.status_change` - contact verification status changes (verified or unverified).\n- `domain.registry.rejection` – domain **create** failed after asynchronous registry processing (uncommon; most creates succeed at request time).\n- `domain.expiration` – domain has expired and entered the post-expiry grace period. This is informational only.",
+                "description": "Creates a webhook subscription to receive real-time notifications about specific domain or account events (e.g. transfer completions, renewals). Pass the callback URL and event types. This allows external systems to stay in sync with name.com changes.\nSupported webhook event names:\n- `account.credit.balance_change` – account credit balance changes (increases or decreases).\n- `account.domain.removal` – domain removed from the subscribing account.\n- `domain.lock.status_change` – domain lock added or removed.\n- `domain.transfer.status_change` – domain transfer IN to name.com; status updates while name.com is the gaining registrar.\n- `domain.transfer_out.status_change` – domain transfer OUT from name.com; `initiated`, `completed` (domain removed), or `canceled` (no longer pending at the registry).\n- `domain.transfer.internal_in` - name.com domain transfers in to the subscribing account via internal transfer.\n- `domain.transfer.internal_out` - name.com domain transfers out of the subscribing account via internal transfer.\n- `contact.verification.status_change` - contact verification status changes (verified or unverified).\n- `domain.registry.rejection` – domain **create** failed after asynchronous registry processing (uncommon; most creates succeed at request time).\n- `domain.registry.compliance_notice` – a registry requires policy remediation for a domain. Default is a registrant email (whitelabeled when configured); subscribe to send it yourself. If you have signed an addendum to assume all email responsibility, name.com does not send this email and the webhook is the only delivery path.\n- `domain.expiration` – domain has expired and entered the post-expiry grace period. This is informational only.",
                 "operationId": "SubscribeToNotification",
                 "requestBody": {
                     "content": {
@@ -15708,7 +15715,7 @@ export const EMBEDDED_SPEC = {
                 ]
             },
             "post": {
-                "description": "Initiates a domain transfer into your name.com account from another registrar. You must provide the domain name and its valid transfer authorization code (EPP code). The domain must not be locked or under any transfer restrictions (e.g. clientTransferProhibited). If successful, the transfer is submitted and tracked through the ICANN transfer process. Once a transfer has been created, you can track its progress via the [GetTransfer](/api/v1/reference/transfers/get-transfer) endpoint.\n**Transfer pricing:** Omit `purchasePrice` for standard (non-premium) transfers. For premium transfers, pass `transferPrice` from [Get Pricing For Domain](/api/v1/reference/domains/get-pricing-for-domain) as `purchasePrice`. If sent, it must match Get Pricing `transferPrice` exactly or the request will fail. Premium transfers without `purchasePrice` will fail. See the [Domain pricing guide](/guides/domain-pricing) for how [Get Pricing](/api/v1/reference/domains/get-pricing-for-domain) `transferPrice` relates to the `years` query parameter.",
+                "description": "Initiates a domain transfer into your name.com account from another registrar. You must provide the domain name and its valid transfer authorization code (EPP code). The domain must not be locked or under any transfer restrictions (e.g. clientTransferProhibited). If successful, the transfer is submitted and tracked through the ICANN transfer process. Once a transfer has been created, you can track its progress via the [GetTransfer](/api/v1/reference/transfers/get-transfer) endpoint.\n**Transfer pricing:** Omit `purchasePrice` for standard (non-premium) transfers. For premium transfers, pass `transferPrice` from [Get Pricing For Domain](/api/v1/reference/domains/get-pricing-for-domain) as `purchasePrice`. If sent, it must match Get Pricing `transferPrice` exactly or the request will fail. Premium transfers without `purchasePrice` will fail. See the [Domain pricing guide](/guides/domain-pricing) for how [Get Pricing](/api/v1/reference/domains/get-pricing-for-domain) `transferPrice` relates to the `years` query parameter.\n**Optional `contacts`** - Omit for account defaults; provided roles override; omitted roles use defaults.",
                 "operationId": "CreateTransfer",
                 "requestBody": {
                     "content": {
@@ -20978,7 +20985,7 @@ export const EMBEDDED_SPEC = {
                 ],
                 "operationId": "DomainTransferStatusChangeWebhook",
                 "summary": "Domain Transfer In Status Change",
-                "description": "Sent when you have subscribed to the event on your account, and a domain transfer IN to name.com is processing.\nThis webhook reports status changes for transfers where name.com is the gaining registrar (i.e., transfers into your name.com account).",
+                "description": "Sent when you have subscribed to the event on your account, and a domain transfer IN to name.com is processing.\nThis webhook reports status changes for transfers where name.com is the gaining registrar (i.e., transfers into your name.com account).\nWhen `status` is `completed` and submitted contacts could not be applied, optional `warning` is included.",
                 "parameters": [
                     {
                         "name": "X-NAMECOM-SIGNATURE",
@@ -20998,6 +21005,25 @@ export const EMBEDDED_SPEC = {
                         "application/json": {
                             "schema": {
                                 "$ref": "#/components/schemas/DomainTransferStatusChange"
+                            },
+                            "examples": {
+                                "completed": {
+                                    "summary": "Transfer completed",
+                                    "value": {
+                                        "eventName": "domain.transfer.status_change",
+                                        "domainName": "example.com",
+                                        "status": "completed"
+                                    }
+                                },
+                                "completedContactFallback": {
+                                    "summary": "Transfer completed; submitted contacts not applied",
+                                    "value": {
+                                        "eventName": "domain.transfer.status_change",
+                                        "domainName": "example.com",
+                                        "status": "completed",
+                                        "warning": "One or more submitted contacts could not be applied and were replaced with the account default contacts. Call Set Contacts to update them with the end-user contacts."
+                                    }
+                                }
                             }
                         }
                     }
@@ -21256,6 +21282,70 @@ export const EMBEDDED_SPEC = {
                     },
                     "5XX": {
                         "description": "The subscribed server experienced an error while processing the request."
+                    }
+                }
+            }
+        },
+        "domainRegistryComplianceNotice": {
+            "post": {
+                "tags": [
+                    "Webhook Notifications"
+                ],
+                "operationId": "DomainRegistryComplianceNoticeWebhook",
+                "summary": "Domain Registry Compliance Notice",
+                "description": "Sent when a registry reports that a domain in your account must remediate a policy compliance issue.\nBy default, name.com emails this notice to the domain's registrant. Whitelabeled branding is applied to that email when your account has it configured. Subscribing replaces the email with this webhook so you can notify the end user; unsubscribing resumes the email.\nIf you have signed an addendum to assume all email responsibility, name.com does not send this email. This webhook is the only delivery path. Without a subscription the registrant is not notified. Webhook delivery failure does not fall back to email.",
+                "parameters": [
+                    {
+                        "name": "X-NAMECOM-SIGNATURE",
+                        "in": "header",
+                        "description": "HMAC signature for the request payload. See HMAC signing documentation for verification details.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DomainRegistryComplianceNotice"
+                            },
+                            "examples": {
+                                "dotNew": {
+                                    "summary": ".new domain does not resolve to an action within 100 days",
+                                    "value": {
+                                        "eventName": "domain.registry.compliance_notice",
+                                        "domainName": "example.new",
+                                        "policy": "new_resolves_within_100_days",
+                                        "policyName": ".NEW Domain Registration Policy",
+                                        "policyUrl": "https://www.registry.google/policies/registration/new/#!/",
+                                        "registryName": "Google Registry",
+                                        "registryEmail": "registry-poc-primary@google.com",
+                                        "originalMessageId": "<CA12345@mail.google.com>",
+                                        "issueDescription": "The registry determined that the domain does not resolve to an action within 100 days of registration.",
+                                        "remediationInstructions": "Configure the domain to launch an online creation or action-generation flow, and ensure the website is accessible using an active SSL certificate.",
+                                        "agreementReminder": "As a reminder, when you registered this domain, you agreed to the .NEW Domain Registration Policy, which includes this requirement.",
+                                        "noncomplianceConsequences": "If the website is still not compliant by the deadline, the registry may suspend or cancel the domain. Suspended domains do not resolve and cannot be transferred or deleted.",
+                                        "contactInstructions": "If you believe the domain is compliant or need to submit evidence, contact Google Registry.",
+                                        "complianceDeadline": "2026-10-25T15:30:00+00:00",
+                                        "remediationPeriodDays": 14
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The subscribed server accepted the request."
+                    },
+                    "4XX": {
+                        "description": "The subscribed server returned an error."
+                    },
+                    "5XX": {
+                        "description": "The subscribed server experienced an error."
                     }
                 }
             }
@@ -22281,7 +22371,7 @@ export const EMBEDDED_SPEC = {
                         "example": 1
                     },
                     "promoCode": {
-                        "description": "PromoCode is an optional promotional code to apply to the domain purchase. Only one promo code can be applied per request.",
+                        "description": "PromoCode is an optional promotional code to apply to the domain purchase. Only one promo code can be applied per request. Promo codes specify eligibility criteria, including duration. If the supplied promo applies no discount, the request fails with `400` and `\"Promo code does not apply a discount to this purchase\"`. The order is not created.",
                         "type": "string",
                         "minLength": 1
                     }
@@ -23631,6 +23721,7 @@ export const EMBEDDED_SPEC = {
                     "domain.transfer.internal_in",
                     "domain.transfer.internal_out",
                     "domain.registry.rejection",
+                    "domain.registry.compliance_notice",
                     "domain.expiration"
                 ]
             },
@@ -23776,7 +23867,7 @@ export const EMBEDDED_SPEC = {
                         "type": "number"
                     },
                     "createDate": {
-                        "description": "CreateDate is the date the order was placed.",
+                        "description": "CreateDate is the UTC date and time the order was placed.",
                         "type": "string"
                     },
                     "currency": {
@@ -24042,12 +24133,6 @@ export const EMBEDDED_SPEC = {
                         "type": "string",
                         "example": "example.com"
                     },
-                    "email": {
-                        "description": "Email is the email address that the approval email was sent to. Not every TLD requries an approval email. This is usually pulled from Whois.",
-                        "type": "string",
-                        "format": "email",
-                        "example": "admin@example.com"
-                    },
                     "status": {
                         "$ref": "#/components/schemas/TransferStatus"
                     }
@@ -24126,6 +24211,14 @@ export const EMBEDDED_SPEC = {
                         "format": "double",
                         "type": "number",
                         "example": 12.99
+                    },
+                    "contacts": {
+                        "description": "WHOIS contacts to apply when the domain lands in the account. If omitted, the gaining account's default contacts are applied. If provided, include any roles to override; omitted roles use the gaining account's default contacts. Each supplied role must include complete contact fields. A registrar contact-change transfer lock may apply according to the gaining account's settings.",
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/ContactsRequest"
+                            }
+                        ]
                     }
                 },
                 "type": "object",
@@ -25564,6 +25657,11 @@ export const EMBEDDED_SPEC = {
                     },
                     "status": {
                         "$ref": "#/components/schemas/TransferStatus"
+                    },
+                    "warning": {
+                        "type": "string",
+                        "description": "Included only when `status` is `completed` and one or more submitted contacts could not be applied and were replaced by account default contacts.  Omitted otherwise.",
+                        "example": "One or more submitted contacts could not be applied and were replaced with the account default contacts. Call Set Contacts to update them with the end-user contacts."
                     }
                 },
                 "required": [
@@ -25831,6 +25929,112 @@ export const EMBEDDED_SPEC = {
                         "type": "string",
                         "description": "Optional human-readable or registry-provided detail about the failure, when available.",
                         "example": "Registry policy violation"
+                    }
+                }
+            },
+            "DomainRegistryComplianceNotice": {
+                "type": "object",
+                "required": [
+                    "eventName",
+                    "domainName",
+                    "policy",
+                    "policyName",
+                    "policyUrl",
+                    "registryName",
+                    "issueDescription",
+                    "remediationInstructions",
+                    "agreementReminder",
+                    "noncomplianceConsequences",
+                    "contactInstructions",
+                    "complianceDeadline",
+                    "remediationPeriodDays"
+                ],
+                "description": "Payload sent when a registry reports that a domain must remediate a policy compliance issue before a deadline. By default, name.com emails the registrant; subscribing replaces that email so you can notify the end user from these fields. If you have signed an addendum to assume all email responsibility, name.com does not send the email and this webhook is the only delivery path. Whitelabeled branding is applied to the email when your account has it configured.",
+                "properties": {
+                    "eventName": {
+                        "type": "string",
+                        "enum": [
+                            "domain.registry.compliance_notice"
+                        ],
+                        "description": "The name of the subscription event."
+                    },
+                    "domainName": {
+                        "type": "string",
+                        "description": "The domain subject to the registry compliance notice.",
+                        "example": "example.new"
+                    },
+                    "policy": {
+                        "type": "string",
+                        "enum": [
+                            "new_resolves_within_100_days",
+                            "new_used_for_action",
+                            "new_account_for_review"
+                        ],
+                        "description": "Stable, namespaced identifier for the registry policy requiring remediation. Branch on this value rather than any human-readable field."
+                    },
+                    "policyName": {
+                        "type": "string",
+                        "description": "Human-readable name of the registration policy associated with the compliance requirement.",
+                        "example": ".NEW Domain Registration Policy"
+                    },
+                    "policyUrl": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "URL of the registration policy associated with the compliance requirement.",
+                        "example": "https://www.registry.google/policies/registration/new/#!/"
+                    },
+                    "registryName": {
+                        "type": "string",
+                        "description": "Human-readable name of the registry that issued the compliance notice.",
+                        "example": "Example Registry"
+                    },
+                    "registryEmail": {
+                        "type": "string",
+                        "format": "email",
+                        "description": "Registry mailbox for evidence and questions, when the registry publishes one. Include it in the message body when notifying the registrant. Omitted when the registry does not publish a contact address.",
+                        "example": "compliance@registry.example"
+                    },
+                    "originalMessageId": {
+                        "type": "string",
+                        "description": "RFC 5322 Message-ID of the registry's original notice, when available. Omitted when the registry notice had no Message-ID.",
+                        "example": "<notice-12345@registry.example>"
+                    },
+                    "issueDescription": {
+                        "type": "string",
+                        "description": "Human-readable explanation of the compliance issue identified by the registry. Suitable for forwarding to the registrant. The wording may change; do not branch on this text.",
+                        "example": "The registry determined that the domain does not resolve to an action within 100 days of registration."
+                    },
+                    "remediationInstructions": {
+                        "type": "string",
+                        "description": "Human-readable instructions for resolving the compliance issue. Suitable for forwarding to the registrant. The wording may change; do not branch on this text.",
+                        "example": "Configure the domain to launch an online creation or action-generation flow, and ensure the website is accessible using an active SSL certificate."
+                    },
+                    "agreementReminder": {
+                        "type": "string",
+                        "description": "Human-readable reminder that the registrant agreed to the applicable registration policy. Suitable for forwarding to the registrant. The wording may change; do not branch on this text.",
+                        "example": "As a reminder, when you registered this domain, you agreed to the .NEW Domain Registration Policy, which includes this requirement."
+                    },
+                    "noncomplianceConsequences": {
+                        "type": "string",
+                        "description": "Human-readable explanation of what the registry may do if the issue is not remediated by `complianceDeadline`. Suitable for forwarding to the registrant.",
+                        "example": "If the website is still not compliant by the deadline, the registry may suspend or cancel the domain. Suspended domains do not resolve and cannot be transferred or deleted."
+                    },
+                    "contactInstructions": {
+                        "type": "string",
+                        "description": "Human-readable instruction for the registrant to contact the registry (not the registrar) if they believe the domain is compliant or need to submit evidence. Suitable for forwarding.",
+                        "example": "If you believe the domain is compliant or need to submit evidence, contact the registry."
+                    },
+                    "complianceDeadline": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "The deadline by which the compliance issue must be remediated.",
+                        "example": "2026-10-25T15:30:00+00:00"
+                    },
+                    "remediationPeriodDays": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "The remediation period supplied by the registry, in days.",
+                        "example": 45
                     }
                 }
             },
