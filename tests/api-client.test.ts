@@ -233,38 +233,20 @@ describe('API Client', () => {
   });
 });
 
-describe('API Client Configuration', () => {
-  // Add test to ensure only MCP URLs are in trusted list
-  test('TRUSTED_MCP_URLS should only contain official MCP URLs', () => {
-    // Read the source file to extract TRUSTED_MCP_URLS
-    const fs = require('fs');
-    const path = require('path');
-    const apiClientPath = path.join(__dirname, '..', 'src', 'api-client.ts');
-    const sourceCode = fs.readFileSync(apiClientPath, 'utf8');
-    
-    // Extract the TRUSTED_MCP_URLS array using regex
-    const trustedUrlsMatch = sourceCode.match(/const TRUSTED_MCP_URLS = \[([\s\S]*?)\];/);
-    expect(trustedUrlsMatch).toBeTruthy();
-    
-    const urlsString = trustedUrlsMatch[1];
-    const urls = urlsString
-      .split(',')
-      .map((line: string) => line.trim())
-      .filter((line: string) => line.startsWith("'") || line.startsWith('"'))
-      .map((line: string) => line.replace(/['"]/g, '').trim());
-    
-    // Define allowed MCP URLs
-    const allowedMcpUrls = [
-      'https://mcp.dev.name.com',
-      'https://mcp.name.com'
-    ];
-    
-    // Check that only allowed URLs are present
-    urls.forEach((url: string) => {
-      expect(allowedMcpUrls).toContain(url);
+describe('API Client TLS', () => {
+  test('never turns off certificate checks for a request', async () => {
+    // Up to 1.2.1 every request to mcp.dev.name.com and mcp.name.com ran with
+    // NODE_TLS_REJECT_UNAUTHORIZED=0, so a forged certificate was accepted and the account's
+    // API token went to whoever presented it. Both hosts have valid public certificates.
+    let seen: string | undefined = 'not called';
+    mockFetch.mockImplementationOnce(async () => {
+      seen = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+      return { ok: true, status: 200, json: async () => ({}) };
     });
-    
-    // Ensure we have exactly the expected URLs
-    expect(urls.sort()).toEqual(allowedMcpUrls.sort());
+
+    await callNameApi('/core/v1/hello');
+
+    expect(seen).not.toBe('not called');
+    expect(seen).not.toBe('0');
   });
-}); 
+});
