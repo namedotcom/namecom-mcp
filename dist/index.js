@@ -3,6 +3,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { SERVER_CONFIG } from "./config.js";
 import { createToolsFromSpec, createFallbackTools } from "./tool-generator.js";
+import { setClientInfo } from "./api-client.js";
 /**
  * Initialize and start the name.com MCP server
  */
@@ -15,6 +16,8 @@ async function main() {
     if (!success) {
         createFallbackTools(server);
     }
+    // The client's name goes in the User-Agent of every Core API request after this.
+    server.server.oninitialized = () => setClientInfo(server.server.getClientVersion());
     // Start the server
     const transport = new StdioServerTransport();
     await server.connect(transport);

@@ -216,6 +216,7 @@ The MCP Inspector is **excellent for testing and troubleshooting** your MCP serv
 - **API Token Security**: Treat your name.com API token like a password
 - **Safe Testing**: Default test environment provides safe experimentation
 - **Least Privilege**: The server only accesses name.com APIs with the permissions of your API token
+- **What name.com Sees**: Each request's User-Agent names this package, its version and the AI tool it runs in, for example `namecom-mcp/1.3.0 (claude-code/2.1.3)`. It does not include your operating system or the AI model
 - **Purchases Need Your Approval**: Registering, renewing or transferring a domain, and refunding an order, first return a preview with the price and charge nothing. The charge happens only when your AI assistant calls again with the one-time token from that preview, after you approve it. The token expires in five minutes and is refused if the price changed
 - **Input Validation**: All inputs are validated using Zod schemas
 - **Error Handling**: Errors are handled gracefully without exposing sensitive information
