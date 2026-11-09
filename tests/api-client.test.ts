@@ -11,7 +11,7 @@ vi.mock('undici', () => ({
   fetch: mockFetch
 }));
 
-import { callNameApi } from '../src/api-client.js';
+import { callNameApi, setClientInfo } from '../src/api-client.js';
 
 describe('API Client', () => {
   beforeEach(() => {
@@ -248,5 +248,44 @@ describe('API Client TLS', () => {
 
     expect(seen).not.toBe('not called');
     expect(seen).not.toBe('0');
+  });
+});
+
+describe('API Client User-Agent', () => {
+  const userAgent = async (): Promise<string> => {
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({}) });
+    await callNameApi('/core/v1/hello');
+    return mockFetch.mock.calls.at(-1)[1].headers['User-Agent'];
+  };
+
+  afterEach(() => setClientInfo(undefined));
+
+  test('names only the package before a client connects', async () => {
+    expect(await userAgent()).toMatch(/^namecom-mcp\/\d+\.\d+\.\d+$/);
+  });
+
+  test('adds the client name and version once it connects', async () => {
+    setClientInfo({ name: 'claude-code', version: '2.1.3' });
+    expect(await userAgent()).toMatch(/^namecom-mcp\/\d+\.\d+\.\d+ \(claude-code\/2\.1\.3\)$/);
+  });
+
+  test('adds the name alone when the client sends no version', async () => {
+    setClientInfo({ name: 'cursor-vscode' });
+    expect(await userAgent()).toMatch(/ \(cursor-vscode\)$/);
+  });
+
+  test('cleans what the client sent before it reaches a log line', async () => {
+    // The name is whatever the client chose to send.
+    setClientInfo({ name: 'Visual Studio Code\r\nX-Injected: 1', version: '1.0 (beta)' });
+    expect(await userAgent()).toMatch(/ \(Visual-Studio-Code-X-Injected-1\/1\.0-beta\)$/);
+    setClientInfo({ name: 'a'.repeat(100), version: '1' });
+    expect(await userAgent()).toMatch(new RegExp(` \\(${'a'.repeat(40)}/1\\)$`));
+  });
+
+  test('keeps the plain User-Agent when the client sends no name', async () => {
+    setClientInfo({ name: '', version: '1.0' });
+    expect(await userAgent()).toMatch(/^namecom-mcp\/\d+\.\d+\.\d+$/);
+    setClientInfo({ name: 42 });
+    expect(await userAgent()).toMatch(/^namecom-mcp\/\d+\.\d+\.\d+$/);
   });
 });
