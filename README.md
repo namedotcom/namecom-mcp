@@ -28,6 +28,7 @@ This MCP server works with **any AI tool that supports the Model Context Protoco
   - [Cursor](https://cursor.com/downloads)
   - [Claude Desktop](https://claude.ai/download)
   - Other MCP-compatible tools (check their documentation)
+- **Node.js 22.12 or newer**. The setup below starts the server with `npx`.
 - **name.com Account** with API credentials ([sign up free](https://www.name.com/) | [help getting credentials](#getting-namecom-api-credentials))
 
 ### Setup
